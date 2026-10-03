@@ -37,27 +37,34 @@ user-visible artifact is the `compress` tool call itself.
   `dcp-rc.json`, and no self-update. Commands and prompt overrides keep upstream
   names: `/dcp`, `/dcp-compress`, and `dcp-prompts/overrides/`.
 
-## Install (local)
+## Install
 
 Requires OpenCode V2 (`@opencode/plugin` ^2.0.22; verified against 2.0.4).
 
 ```bash
-opencode plugin add /path/to/opencode-dcp-rc
+opencode plugin add opencode-dcp-rc@latest
 ```
 
-or reference the directory in `opencode.json(c)`:
+or reference the package in `opencode.json(c)`:
 
 ```jsonc
 {
-    "plugins": ["/path/to/opencode-dcp-rc"],
+    "plugins": ["opencode-dcp-rc"],
 }
 ```
 
-Build the package first:
+> **Note:** installing directly from the Git URL
+> (`opencode plugin add https://github.com/royalcat/opencode-dcp-rc`) currently
+> fails because of an
+> [OpenCode bug](https://github.com/anomalyco/opencode/issues/49704) when
+> installing git dependencies. Install from npm as above.
+
+### Local development
 
 ```bash
-npm install
+npm install --legacy-peer-deps
 npm run build
+opencode plugin add /path/to/opencode-dcp-rc
 ```
 
 ## Configuration

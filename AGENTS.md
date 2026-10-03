@@ -97,8 +97,12 @@ check, typecheck, build, test, `npm audit`.
   logic in `rc.ts`, `summary.ts`, and `compress-rc.ts`; avoid spreading rc branches
   through upstream modules.
 - Do not rename upstream files or remove attribution. Keep AGPL headers.
-- Version bumps: ask the owner. Publishing is handled manually by the owner;
-  `prepublishOnly` runs `check:package`.
+- Version bumps: ask the owner. Pushes to `master` run
+  `.github/workflows/publish.yml`: it skips when the version is already on npm,
+  otherwise it runs checks and publishes with provenance through npm trusted
+  publishing (configured on npmjs.com for `royalcat/opencode-dcp-rc` +
+  `publish.yml`). `prepublishOnly` runs `check:package`; a manual publish needs
+  `npm login` then `npm publish --access public`.
 
 ## Testing notes
 
