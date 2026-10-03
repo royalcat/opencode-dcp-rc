@@ -14,7 +14,7 @@ const session = {
     model: { id: "test", providerID: "test" },
 } as Parameters<typeof project>[2]
 const config = {
-    compress: { mode: "range", permission: "allow", protectUserMessages: false },
+    compress: { permission: "allow", protectUserMessages: false },
 } as PluginConfig
 const logger = new Logger(false)
 function transcript(): Message[] {
@@ -103,7 +103,7 @@ test("V2 ID injection preserves signatures, media and tool pairing", () => {
     const view = project(native, entries(native), session)
     const state = createSessionState("compact")
     assignMessageRefs(state, view.messages)
-    injectMessageIds(state, config, view.messages, new Map())
+    injectMessageIds(state, config, view.messages)
     const restored = view.restore()
     assert.deepEqual(restored[0], native[0])
     assert.equal(restored[1]!.content[0], native[1]!.content[0])
@@ -119,7 +119,7 @@ test("V2 tool pruning replaces only marked results", () => {
     const view = project(native, entries(native), session)
     const state = createSessionState("compact")
     state.prune.tools.set("call_one", 100)
-    prune(state, logger, config, view.messages)
+    prune(state, logger, view.messages)
     const restored = view.restore()
     assert.match(JSON.stringify(restored[3]!.content[0]), /Output removed/)
     assert.equal(restored[3]!.content[1], native[3]!.content[1])
@@ -135,7 +135,7 @@ test("V2 compression removes the assistant and its ID-less results together", ()
         allBlockIds: [1],
         activeBlockIds: [1],
     })
-    prune(state, logger, config, view.messages)
+    prune(state, logger, view.messages)
     const restored = view.restore()
     assert.deepEqual(restored, [native[0], native[1], native[4]])
 })
@@ -163,7 +163,7 @@ test("V2 inserts summaries after native checkpoints without an ordinary user mes
         anchorMessageId: "msg_assistant",
         summary: "CHECKPOINT_SUMMARY",
     } as CompressionBlock)
-    prune(state, logger, config, view.messages, view.summaryBase)
+    prune(state, logger, view.messages, view.summaryBase)
     const restored = view.restore()
     assert.equal(restored.length, 2)
     assert.deepEqual(restored[0], native[0])

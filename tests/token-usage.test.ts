@@ -31,7 +31,6 @@ function buildConfig(maxContextLimit: number, minContextLimit = 1): PluginConfig
         },
         protectedFilePatterns: [],
         compress: {
-            mode: "message",
             permission: "allow",
             showCompression: false,
             summaryBuffer: true,
@@ -183,7 +182,7 @@ function createActiveBlock(
         deactivatedByUser: false,
         compressedTokens: 0,
         summaryTokens,
-        mode: "message",
+        mode: "rc",
         topic: `Summary ${blockId}`,
         batchTopic: `Summary ${blockId}`,
         startId: "m0001",

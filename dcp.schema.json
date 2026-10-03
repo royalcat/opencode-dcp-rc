@@ -16,11 +16,6 @@
             "default": true,
             "description": "Enable or disable the DCP plugin"
         },
-        "autoUpdate": {
-            "type": "boolean",
-            "default": true,
-            "description": "Automatically update npm-installed DCP when a newer npm latest version is available. Version-locked plugin specs are not updated."
-        },
         "debug": {
             "type": "boolean",
             "default": false,
@@ -29,7 +24,7 @@
         "pruneNotification": {
             "type": "string",
             "enum": ["off", "minimal", "detailed"],
-            "default": "detailed",
+            "default": "off",
             "description": "Level of notification shown when context management occurs"
         },
         "pruneNotificationType": {
@@ -131,15 +126,9 @@
         },
         "compress": {
             "type": "object",
-            "description": "Configuration for the unified compress tool",
+            "description": "Configuration for the unified compress tool (selection-only rc mode)",
             "additionalProperties": false,
             "properties": {
-                "mode": {
-                    "type": "string",
-                    "enum": ["range", "message"],
-                    "default": "range",
-                    "description": "Compression mode. 'range' compresses spans into block summaries, 'message' compresses individual raw messages."
-                },
                 "permission": {
                     "type": "string",
                     "enum": ["ask", "allow", "deny"],
@@ -246,11 +235,10 @@
                 "protectUserMessages": {
                     "type": "boolean",
                     "default": false,
-                    "description": "When enabled, your messages are never lost during compression"
+                    "description": "When enabled, your messages are marked as BLOCKED and are never included in a compression."
                 }
             },
             "default": {
-                "mode": "range",
                 "permission": "allow",
                 "showCompression": false,
                 "summaryBuffer": true,

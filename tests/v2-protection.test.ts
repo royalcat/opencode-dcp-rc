@@ -57,7 +57,7 @@ test("Code Mode protections survive caching, strategy selection, and compression
 
     const context = buildSearchContext(state, messages)
     const boundary = { kind: "message" as const, rawIndex: 0, messageId: "first" }
-    const selection = resolveSelection(context, boundary, boundary)
+    const selection = resolveSelection(context, config, boundary, boundary)
     const summary = await appendProtectedTools(
         {},
         state,

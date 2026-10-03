@@ -29,7 +29,7 @@ const context = z.object({
 })
 
 export const rpc = {
-    id: "dcp",
+    id: "dcp-rc",
     methods: {
         status: { input: z.object({}), output: z.object({ enabled: z.boolean() }) },
         snapshot: {

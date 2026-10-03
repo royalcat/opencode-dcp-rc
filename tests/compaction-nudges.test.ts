@@ -12,7 +12,6 @@ test("compaction replays existing nudges without changing the cached prefix or a
     const config = {
         compress: {
             permission: "allow",
-            mode: "range",
             minContextLimit: 0,
             maxContextLimit: 1,
             nudgeFrequency: 1,
@@ -53,7 +52,7 @@ test("compaction replays existing nudges without changing the cached prefix or a
         ...raw,
         { ...user, info: { ...user.info, id: "msg_later" } },
     ]) as WithParts[]
-    injectCompressNudges(state, config, logger, compact, prompts, undefined, false)
+    injectCompressNudges(state, config, logger, compact, prompts, false)
     assert.deepEqual(compact.slice(0, raw.length), primary)
     assert.deepEqual(state.nudges, anchors)
     assert.doesNotMatch(JSON.stringify(compact.at(-1)), /NUDGE_KEEP/)

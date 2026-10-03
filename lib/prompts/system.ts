@@ -6,7 +6,7 @@ export function systemPrompt(format: IdFormat = "xml"): string {
     return `
 You operate in a context-constrained environment. Manage context continuously to avoid buildup and preserve retrieval quality. Efficient context management is paramount for your agentic performance.
 
-The ONLY tool you have for context management is \`compress\`. It replaces older conversation content with technical summaries you produce.
+The ONLY tool you have for context management is \`compress\`. It replaces older conversation content with compact technical summaries.
 
 ${markers} and \`<dcp-system-reminder>\` tags are environment-injected metadata. Do not output them.
 

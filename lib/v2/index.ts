@@ -3,7 +3,8 @@ import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import { getConfig } from "../config"
 import { Logger } from "../logger"
 import { PromptStore } from "../prompts/store"
-import { createCompressMessageTool, createCompressRangeTool } from "../compress"
+import { createRcCompressTool } from "../compress"
+import { RC_SUMMARY_MARKER } from "../compress/summary"
 import { attachCompressionDuration } from "../compress/state"
 import { createCommandExecuteHandler, createSystemPromptHandler } from "../hooks"
 import {
@@ -17,7 +18,6 @@ import {
 import { assignMessageRefs } from "../message-ids"
 import { applyPendingManualTrigger } from "../commands/manual"
 import {
-    buildPriorityMap,
     buildToolIdList,
     injectCompressNudges,
     injectMessageIds,
@@ -197,7 +197,7 @@ export async function setup(ctx: Plugin.Context) {
                 syncCompressionBlocks(state, logger, messages)
                 syncToolCache(state, config, logger, view.messages)
                 buildToolIdList(state, view.messages)
-                prune(state, logger, config, view.messages, view.summaryBase)
+                prune(state, logger, view.messages, view.summaryBase)
                 await injectExtendedSubAgentResults(
                     client,
                     state,
@@ -205,7 +205,6 @@ export async function setup(ctx: Plugin.Context) {
                     view.messages,
                     config.experimental.allowSubAgents,
                 )
-                const priorities = buildPriorityMap(config, state, view.messages)
                 prompts.reload()
                 injectCompressNudges(
                     state,
@@ -213,10 +212,9 @@ export async function setup(ctx: Plugin.Context) {
                     logger,
                     view.messages,
                     prompts.getRuntimePrompts(),
-                    priorities,
                     kind === "context",
                 )
-                injectMessageIds(state, config, view.messages, priorities)
+                injectMessageIds(state, config, view.messages)
                 applyPendingManualTrigger(state, view.messages, logger)
                 event.messages = view.restore()
                 const system = { system: event.system.map((part) => part.text) }
@@ -241,11 +239,45 @@ export async function setup(ctx: Plugin.Context) {
             }),
         )
 
+    // Hidden summary generation for rc mode: when our marker is present, drop
+    // the session context and every tool so the transient request contains
+    // only the prompt we built. This keeps the summarization request invisible
+    // and independent of any injected metadata.
+    await ctx.session.hook("generate", (event) => {
+        const own = event.messages.filter(
+            (message) =>
+                Array.isArray(message.content) &&
+                message.content.some(
+                    (part: any) =>
+                        part?.type === "text" &&
+                        typeof part.text === "string" &&
+                        part.text.includes(RC_SUMMARY_MARKER),
+                ),
+        )
+        if (own.length === 0) {
+            return
+        }
+        event.messages = own as typeof event.messages
+        for (const name of Object.keys(event.tools ?? {})) {
+            delete (event.tools as Record<string, unknown>)[name]
+        }
+    })
+
     if (config.compress.permission !== "deny") {
-        const define = (state: SessionState): ToolDefinition =>
-            (config.compress.mode === "message"
-                ? createCompressMessageTool
-                : createCompressRangeTool)({ client, state, logger, config, prompts })
+        const define = (state: SessionState): ToolDefinition => {
+            const context = {
+                client,
+                state,
+                logger,
+                config,
+                prompts,
+                generate: async (input: { sessionID: string; prompt: string }) => {
+                    const result = await ctx.session.generate(input)
+                    return result?.text ?? ""
+                },
+            }
+            return createRcCompressTool(context)
+        }
         const definition = define(createSessionState("compact"))
         await ctx.tool.transform((editor) =>
             editor.add({
@@ -279,8 +311,7 @@ export async function setup(ctx: Plugin.Context) {
                             Date.now() - started,
                         )
                         await saveSessionState(state, logger)
-                        // Both shared compression executors return text; the V1 helper's
-                        // public return type also permits unrelated attachment results.
+                        // The rc executor returns the tool result text.
                         return { content: content as string }
                     }),
             }),
@@ -309,7 +340,6 @@ export async function setup(ctx: Plugin.Context) {
                                 logger,
                                 config,
                                 ctx.location.directory,
-                                { global: { compress: permission }, agents: {} },
                             )(
                                 {
                                     command: name,

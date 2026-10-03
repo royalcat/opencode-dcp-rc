@@ -3,15 +3,9 @@ import type { PluginConfig } from "../../config"
 import {
     appendGuidanceToDcpTag,
     buildCompressedBlockGuidance,
-    renderMessagePriorityGuidance,
 } from "../../prompts/extensions/nudge"
 import type { RuntimePrompts } from "../../prompts/store"
 import type { UserMessage } from "@opencode-ai/sdk/v2"
-import {
-    type CompressionPriorityMap,
-    type MessagePriority,
-    listPriorityRefsBeforeIndex,
-} from "../priority"
 import {
     appendToTextPart,
     appendToLastTextPart,
@@ -21,8 +15,6 @@ import {
 import { getLastUserMessage, isIgnoredUserMessage } from "../query"
 import { getCurrentTokenUsage } from "../../token-utils"
 import { getActiveSummaryTokenUsage } from "../../state/utils"
-
-const MESSAGE_MODE_NUDGE_PRIORITY: MessagePriority = "high"
 
 export interface LastUserModelContext {
     providerId: string | undefined
@@ -192,22 +184,6 @@ export function addAnchor(
     return anchorMessageIds.size !== previousSize
 }
 
-function buildMessagePriorityGuidance(
-    messages: WithParts[],
-    compressionPriorities: CompressionPriorityMap | undefined,
-    anchorIndex: number,
-    priority: MessagePriority,
-): string {
-    if (!compressionPriorities || compressionPriorities.size === 0) {
-        return ""
-    }
-
-    const refs = listPriorityRefsBeforeIndex(messages, compressionPriorities, anchorIndex, priority)
-    const priorityLabel = `${priority[0].toUpperCase()}${priority.slice(1)}`
-
-    return renderMessagePriorityGuidance(priorityLabel, refs)
-}
-
 function injectAnchoredNudge(message: WithParts, nudgeText: string): void {
     if (!nudgeText.trim()) {
         return
@@ -287,7 +263,7 @@ function collectTurnNudgeAnchors(
     return turnNudgeAnchors
 }
 
-function applyRangeModeAnchoredNudge(
+function applyGuidedAnchoredNudge(
     anchorMessageIds: Set<string>,
     messages: WithParts[],
     baseNudgeText: string,
@@ -303,69 +279,23 @@ function applyRangeModeAnchoredNudge(
     }
 }
 
-function applyMessageModeAnchoredNudge(
-    anchorMessageIds: Set<string>,
-    messages: WithParts[],
-    baseNudgeText: string,
-    compressionPriorities?: CompressionPriorityMap,
-): void {
-    for (const { message, index } of collectAnchoredMessages(anchorMessageIds, messages)) {
-        const priorityGuidance = buildMessagePriorityGuidance(
-            messages,
-            compressionPriorities,
-            index,
-            MESSAGE_MODE_NUDGE_PRIORITY,
-        )
-        const nudgeText = appendGuidanceToDcpTag(baseNudgeText, priorityGuidance)
-        injectAnchoredNudge(message, nudgeText)
-    }
-}
-
 export function applyAnchoredNudges(
     state: SessionState,
     config: PluginConfig,
     messages: WithParts[],
     prompts: RuntimePrompts,
-    compressionPriorities?: CompressionPriorityMap,
 ): void {
     const turnNudgeAnchors = collectTurnNudgeAnchors(state, config, messages)
-
-    if (config.compress.mode === "message") {
-        applyMessageModeAnchoredNudge(
-            state.nudges.contextLimitAnchors,
-            messages,
-            prompts.contextLimitNudge,
-            compressionPriorities,
-        )
-        applyMessageModeAnchoredNudge(
-            turnNudgeAnchors,
-            messages,
-            prompts.turnNudge,
-            compressionPriorities,
-        )
-        applyMessageModeAnchoredNudge(
-            state.nudges.iterationNudgeAnchors,
-            messages,
-            prompts.iterationNudge,
-            compressionPriorities,
-        )
-        return
-    }
-
     const compressedBlockGuidance = buildCompressedBlockGuidance(state)
-    applyRangeModeAnchoredNudge(
+
+    applyGuidedAnchoredNudge(
         state.nudges.contextLimitAnchors,
         messages,
         prompts.contextLimitNudge,
         compressedBlockGuidance,
     )
-    applyRangeModeAnchoredNudge(
-        turnNudgeAnchors,
-        messages,
-        prompts.turnNudge,
-        compressedBlockGuidance,
-    )
-    applyRangeModeAnchoredNudge(
+    applyGuidedAnchoredNudge(turnNudgeAnchors, messages, prompts.turnNudge, compressedBlockGuidance)
+    applyGuidedAnchoredNudge(
         state.nudges.iterationNudgeAnchors,
         messages,
         prompts.iterationNudge,

@@ -1,3 +1,103 @@
+# opencode-dcp-rc
+
+A fork of [Dynamic Context Pruning](https://github.com/Tarquinen/opencode-dynamic-context-pruning)
+
+## Why this fork exists
+
+Upstream DCP is solid engineering, but its developers have clearly focused on their
+commercial product, [Sleev](https://sleev.ai), and the open plugin gets the
+leftovers. The core idea — the model picks stale messages and the summaries are
+generated locally through your existing provider — needs no account, device lease,
+or telemetry pipeline. This fork ports that idea back into the plugin, keeps it
+fully local and invisible, and stays open for anyone who wants better context
+management in OpenCode.
+
+**Design goal: the plugin stays invisible.** Injected system prompts, message-ID
+tags, nudges, and summary replacement only ever exist in the outgoing model
+request. The user's stored history is never rewritten, and the only
+user-visible artifact is the `compress` tool call itself.
+
+## How it differs from upstream DCP
+
+- **The model selects; the plugin compresses.** `compress` takes only message IDs,
+  block IDs, or inclusive ranges — for example
+  `{ "ids": ["m0004-m0008", "m0011"] }` — never summary text. The plugin produces
+  one summary per selection with a dedicated prompt through your existing provider,
+  so compression follows a fixed, repeatable format instead of depending on what
+  the chat model would write inside the tool call.
+
+- **OpenCode V2 only.** No V1 support and no upstream `range`/`message` modes.
+
+- **Invisible by design.** Hiding is the intended behavior, not a setting: injected
+  prompts, message IDs, and nudges exist only in the request copy sent to the
+  model, stored history is never rewritten, and the only visible artifact is the
+  `compress` tool call and its result.
+
+- **Fork names.** Package `opencode-dcp-rc`, config `dcp-rc.jsonc` /
+  `dcp-rc.json`, and no self-update. Commands and prompt overrides keep upstream
+  names: `/dcp`, `/dcp-compress`, and `dcp-prompts/overrides/`.
+
+## Install (local)
+
+Requires OpenCode V2 (`@opencode/plugin` ^2.0.22; verified against 2.0.4).
+
+```bash
+opencode plugin add /path/to/opencode-dcp-rc
+```
+
+or reference the directory in `opencode.json(c)`:
+
+```jsonc
+{
+    "plugins": ["/path/to/opencode-dcp-rc"],
+}
+```
+
+Build the package first:
+
+```bash
+npm install
+npm run build
+```
+
+## Configuration
+
+`~/.config/opencode/dcp-rc.jsonc` (created on first run):
+
+```jsonc
+{
+    "compress": {
+        "permission": "allow",
+        "minContextLimit": 50000,
+        "maxContextLimit": 100000,
+    },
+    "pruneNotification": "off",
+}
+```
+
+The rest of the upstream configuration (strategies, protection lists, manual
+mode, subagents) still applies, except `compress.mode` and `autoUpdate`, which
+the fork no longer uses. Compress prompt text can be overridden through
+`dcp-prompts/overrides/` when `experimental.customPrompts` is enabled.
+
+## Status and limitations
+
+- The hidden summary call uses the session's provider/model and consumes a normal
+  model request. Its system prompt is a prefix of the main request, so providers
+  with prefix caching can reuse it.
+- If the host rejects nested generation, the `compress` call fails visibly and the
+  selection is left uncompressed so it can be retried.
+- Forked from DCP v3.2.0. Upstream is AGPL-3.0-or-later; this fork keeps the
+  same license and attribution (see `LICENSE`).
+
+---
+
+# Upstream README
+
+> **Fork note:** The upstream documentation below is kept for attribution and
+> history. This fork does not ship its `range`/`message` modes, V1 support, or
+> auto-update behavior; see the fork section above for what this package does.
+
 # Dynamic Context Pruning Plugin
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/dansmolsky)

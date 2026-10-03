@@ -22,7 +22,6 @@ function buildConfig(manualMode = false): PluginConfig {
         experimental: { allowSubAgents: false, customPrompts: false },
         protectedFilePatterns: [],
         compress: {
-            mode: "message",
             permission: "allow",
             showCompression: false,
             maxContextLimit: 150000,

@@ -23,12 +23,3 @@ export type ViewApi = {
     ui: { dialog: { clear(): void } }
 }
 export type StatsReport = Awaited<ReturnType<typeof buildStatsReport>>
-
-export type DcpCommand = {
-    title: string
-    name: string
-    description: string
-    slashName: string
-    slashAliases?: string[]
-    run: () => void | Promise<void>
-}

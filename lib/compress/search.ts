@@ -1,6 +1,7 @@
 import type { SessionState, WithParts } from "../state"
+import type { PluginConfig } from "../config"
 import { formatBlockRef, parseBoundaryId } from "../message-ids"
-import { isIgnoredUserMessage } from "../messages/query"
+import { isIgnoredUserMessage, isProtectedUserMessage } from "../messages/query"
 import { filterMessages } from "../messages/shape"
 import { countAllMessageTokens } from "../token-utils"
 import type { BoundaryReference, SearchContext, SelectionResolution } from "./types"
@@ -46,10 +47,11 @@ export function buildSearchContext(state: SessionState, rawMessages: WithParts[]
 export function resolveBoundaryIds(
     context: SearchContext,
     state: SessionState,
+    config: PluginConfig,
     startId: string,
     endId: string,
 ): { startReference: BoundaryReference; endReference: BoundaryReference } {
-    const lookup = buildBoundaryLookup(context, state)
+    const lookup = buildBoundaryLookup(context, state, config)
     const issues: string[] = []
     const parsedStartId = parseBoundaryId(startId, state.idFormat)
     const parsedEndId = parseBoundaryId(endId, state.idFormat)
@@ -114,6 +116,7 @@ export function resolveBoundaryIds(
 
 export function resolveSelection(
     context: SearchContext,
+    config: PluginConfig,
     startReference: BoundaryReference,
     endReference: BoundaryReference,
 ): SelectionResolution {
@@ -132,7 +135,7 @@ export function resolveSelection(
         if (!rawMessage) {
             continue
         }
-        if (isIgnoredUserMessage(rawMessage)) {
+        if (isIgnoredUserMessage(rawMessage) || isProtectedUserMessage(config, rawMessage)) {
             continue
         }
 
@@ -219,6 +222,7 @@ export function resolveAnchorMessageId(startReference: BoundaryReference): strin
 function buildBoundaryLookup(
     context: SearchContext,
     state: SessionState,
+    config: PluginConfig,
 ): Map<string, BoundaryReference> {
     const lookup = new Map<string, BoundaryReference>()
 
@@ -227,7 +231,7 @@ function buildBoundaryLookup(
         if (!rawMessage) {
             continue
         }
-        if (isIgnoredUserMessage(rawMessage)) {
+        if (isIgnoredUserMessage(rawMessage) || isProtectedUserMessage(config, rawMessage)) {
             continue
         }
 

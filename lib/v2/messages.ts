@@ -112,14 +112,29 @@ export function project(native: Message[], entries: History, session: Session) {
             let projected: Part | undefined
             if (part.type === "text")
                 projected = { ...base, id: `${message.id}:${index}`, type: "text", text: part.text }
-            if (part.type === "media")
+            if (part.type === "media") {
+                // Tolerate both media shapes: older hosts expose mediaType/data
+                // directly, newer ones nest them under `media`.
+                const media: any = (part as any).media
+                const legacy: any = part as any
+                const mime = media?.mediaType ?? legacy.mediaType ?? ""
+                const source = media?.source
+                const url =
+                    typeof legacy.data === "string"
+                        ? legacy.data
+                        : typeof source?.data === "string"
+                          ? source.data
+                          : typeof source?.url === "string"
+                            ? source.url
+                            : ""
                 projected = {
                     ...base,
                     id: `${message.id}:${index}`,
                     type: "file",
-                    mime: part.mediaType,
-                    url: typeof part.data === "string" ? part.data : "",
+                    mime,
+                    url,
                 }
+            }
             if (part.type === "tool-call") {
                 const result = results.get(part.id)
                 const entry = byID.get(message.id)

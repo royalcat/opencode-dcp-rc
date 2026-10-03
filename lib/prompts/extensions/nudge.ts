@@ -12,17 +12,7 @@ export function buildCompressedBlockGuidance(state: SessionState): string {
     return [
         "Compressed block context:",
         `- Active compressed blocks in this session: ${blockCount} (${blockList})`,
-        `- If your selected compression range includes any listed block, include each required placeholder exactly once in the summary using \`${state.idFormat === "compact" ? "@b1@" : "(bN)"}\`.`,
-    ].join("\n")
-}
-
-export function renderMessagePriorityGuidance(priorityLabel: string, refs: string[]): string {
-    const refList = refs.length > 0 ? refs.join(", ") : "none"
-
-    return [
-        "Message priority context:",
-        "- Higher-priority older messages consume more context and should be compressed right away if it is safe to do so.",
-        `- ${priorityLabel}-priority message IDs before this point: ${refList}`,
+        "- Compressed blocks can be used as selection boundaries: include a block ID (or a range spanning it) to merge its summary into a new summary and retire the old block.",
     ].join("\n")
 }
 

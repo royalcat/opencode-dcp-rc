@@ -64,7 +64,6 @@ export function isProtectedUserMessage(config: PluginConfig, message: WithParts)
     }
 
     return (
-        config.compress.mode === "message" &&
         config.compress.protectUserMessages &&
         message.info.role === "user" &&
         !isIgnoredUserMessage(message)

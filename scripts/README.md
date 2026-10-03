@@ -1,30 +1,34 @@
-# DCP CLI
+# DCP Prompt Preview CLI
 
 Dev tool for previewing prompt outputs.
 
 ## Usage
 
 ```bash
-bun run dcp [TYPE]
+npm run dcp -- [options]
 ```
 
-## Types
+## Options
 
-| Flag                 | Description                              |
-| -------------------- | ---------------------------------------- |
-| `--system`           | System prompt                            |
-| `--nudge`            | Standard nudge prompt                    |
-| `--compress-nudge`   | Context-limit compress nudge             |
-| `--context-tools`    | Example `<context-pressure-tools>` block |
-| `--compress-context` | Example `<compress-context>` block       |
-| `--cooldown`         | Cooldown context-info block              |
+| Flag                | Description                           |
+| ------------------- | ------------------------------------- |
+| `--list`            | List available prompt keys            |
+| `--show <key>`      | Print effective prompt text for a key |
+| `--system`          | System prompt with no extensions      |
+| `--system-manual`   | System prompt with manual extension   |
+| `--system-subagent` | System prompt with subagent extension |
+| `--system-all`      | System prompt with both extensions    |
+
+## Prompt keys
+
+`system`, `compress-rc`, `context-limit-nudge`, `turn-nudge`, `iteration-nudge`
 
 ## Examples
 
 ```bash
-bun run dcp --system
-bun run dcp --nudge
-bun run dcp --context-tools
+npm run dcp -- --list
+npm run dcp -- --show compress-rc
+npm run dcp -- --system-all
 ```
 
 ## Purpose

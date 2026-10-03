@@ -211,7 +211,7 @@ export function loadPruneMessagesState(
                     typeof block.durationMs === "number" && Number.isFinite(block.durationMs)
                         ? Math.max(0, block.durationMs)
                         : 0,
-                mode: block.mode === "range" || block.mode === "message" ? block.mode : undefined,
+                mode: block.mode === "rc" ? "rc" : undefined,
                 topic: typeof block.topic === "string" ? block.topic : "",
                 batchTopic:
                     typeof block.batchTopic === "string"

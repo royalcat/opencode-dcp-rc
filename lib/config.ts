@@ -15,7 +15,6 @@ type ConfigContext = Pick<PluginInput, "directory"> & {
 }
 
 type Permission = "ask" | "allow" | "deny"
-type CompressMode = "range" | "message"
 
 export interface Deduplication {
     enabled: boolean
@@ -23,7 +22,6 @@ export interface Deduplication {
 }
 
 export interface CompressConfig {
-    mode: CompressMode
     permission: Permission
     showCompression: boolean
     summaryBuffer: boolean
@@ -67,7 +65,6 @@ export interface ExperimentalConfig {
 
 export interface PluginConfig {
     enabled: boolean
-    autoUpdate: boolean
     debug: boolean
     pruneNotification: "off" | "minimal" | "detailed"
     pruneNotificationType: "chat" | "toast"
@@ -103,7 +100,6 @@ const COMPRESS_DEFAULT_PROTECTED_TOOLS = ["task", "skill", "todowrite", "todorea
 export const VALID_CONFIG_KEYS = new Set([
     "$schema",
     "enabled",
-    "autoUpdate",
     "debug",
     "showUpdateToasts",
     "pruneNotification",
@@ -122,7 +118,6 @@ export const VALID_CONFIG_KEYS = new Set([
     "manualMode.enabled",
     "manualMode.automaticStrategies",
     "compress",
-    "compress.mode",
     "compress.permission",
     "compress.showCompression",
     "compress.summaryBuffer",
@@ -180,10 +175,6 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
 
     if (config.enabled !== undefined && typeof config.enabled !== "boolean") {
         errors.push({ key: "enabled", expected: "boolean", actual: typeof config.enabled })
-    }
-
-    if (config.autoUpdate !== undefined && typeof config.autoUpdate !== "boolean") {
-        errors.push({ key: "autoUpdate", expected: "boolean", actual: typeof config.autoUpdate })
     }
 
     if (config.debug !== undefined && typeof config.debug !== "boolean") {
@@ -361,18 +352,6 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
                 actual: typeof compress,
             })
         } else {
-            if (
-                compress.mode !== undefined &&
-                compress.mode !== "range" &&
-                compress.mode !== "message"
-            ) {
-                errors.push({
-                    key: "compress.mode",
-                    expected: '"range" | "message"',
-                    actual: JSON.stringify(compress.mode),
-                })
-            }
-
             if (
                 compress.summaryBuffer !== undefined &&
                 typeof compress.summaryBuffer !== "boolean"
@@ -665,9 +644,8 @@ function showConfigWarnings(
 
 const defaultConfig: PluginConfig = {
     enabled: true,
-    autoUpdate: true,
     debug: false,
-    pruneNotification: "detailed",
+    pruneNotification: "off",
     pruneNotificationType: "chat",
     commands: {
         enabled: true,
@@ -687,7 +665,6 @@ const defaultConfig: PluginConfig = {
     },
     protectedFilePatterns: [],
     compress: {
-        mode: "range",
         permission: "allow",
         showCompression: false,
         summaryBuffer: true,
@@ -716,8 +693,8 @@ const defaultConfig: PluginConfig = {
 const GLOBAL_CONFIG_DIR = process.env.XDG_CONFIG_HOME
     ? join(process.env.XDG_CONFIG_HOME, "opencode")
     : join(homedir(), ".config", "opencode")
-const GLOBAL_CONFIG_PATH_JSONC = join(GLOBAL_CONFIG_DIR, "dcp.jsonc")
-const GLOBAL_CONFIG_PATH_JSON = join(GLOBAL_CONFIG_DIR, "dcp.json")
+const GLOBAL_CONFIG_PATH_JSONC = join(GLOBAL_CONFIG_DIR, "dcp-rc.jsonc")
+const GLOBAL_CONFIG_PATH_JSON = join(GLOBAL_CONFIG_DIR, "dcp-rc.json")
 
 function findOpencodeDir(startDir: string): string | null {
     let current = startDir
@@ -749,8 +726,8 @@ function getConfigPaths(ctx?: ConfigContext): {
     let configDir: string | null = null
     const opencodeConfigDir = process.env.OPENCODE_CONFIG_DIR
     if (opencodeConfigDir) {
-        const configJsonc = join(opencodeConfigDir, "dcp.jsonc")
-        const configJson = join(opencodeConfigDir, "dcp.json")
+        const configJsonc = join(opencodeConfigDir, "dcp-rc.jsonc")
+        const configJson = join(opencodeConfigDir, "dcp-rc.json")
         configDir = existsSync(configJsonc)
             ? configJsonc
             : existsSync(configJson)
@@ -762,8 +739,8 @@ function getConfigPaths(ctx?: ConfigContext): {
     if (ctx?.directory) {
         const opencodeDir = findOpencodeDir(ctx.directory)
         if (opencodeDir) {
-            const projectJsonc = join(opencodeDir, "dcp.jsonc")
-            const projectJson = join(opencodeDir, "dcp.json")
+            const projectJsonc = join(opencodeDir, "dcp-rc.jsonc")
+            const projectJson = join(opencodeDir, "dcp-rc.json")
             project = existsSync(projectJsonc)
                 ? projectJsonc
                 : existsSync(projectJson)
@@ -781,7 +758,10 @@ function createDefaultConfig(): void {
     }
 
     const configContent = `{
-  "$schema": "https://raw.githubusercontent.com/Opencode-DCP/opencode-dynamic-context-pruning/master/dcp.schema.json"
+  // DCP-RC fork configuration.
+  // Summaries are generated automatically after the model selects IDs
+  // (compress tool), and pruneNotification = "off" keeps the plugin's
+  // internals hidden; only the compress tool call is visible.
 }
 `
     writeFileSync(GLOBAL_CONFIG_PATH_JSONC, configContent, "utf-8")
@@ -851,7 +831,6 @@ function mergeCompress(
     }
 
     return {
-        mode: override.mode ?? base.mode,
         permission: override.permission ?? base.permission,
         showCompression: override.showCompression ?? base.showCompression,
         summaryBuffer: override.summaryBuffer ?? base.summaryBuffer,
@@ -942,7 +921,6 @@ function deepCloneConfig(config: PluginConfig): PluginConfig {
 function mergeLayer(config: PluginConfig, data: Record<string, any>): PluginConfig {
     return {
         enabled: data.enabled ?? config.enabled,
-        autoUpdate: data.autoUpdate ?? config.autoUpdate,
         debug: data.debug ?? config.debug,
         pruneNotification: data.pruneNotification ?? config.pruneNotification,
         pruneNotificationType: data.pruneNotificationType ?? config.pruneNotificationType,

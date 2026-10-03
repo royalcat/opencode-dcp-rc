@@ -9,28 +9,8 @@ export interface ToolContext {
     logger: Logger
     config: PluginConfig
     prompts: PromptStore
-}
-
-export interface CompressRangeEntry {
-    startId: string
-    endId: string
-    summary: string
-}
-
-export interface CompressRangeToolArgs {
-    topic: string
-    content: CompressRangeEntry[]
-}
-
-export interface CompressMessageEntry {
-    messageId: string
-    topic: string
-    summary: string
-}
-
-export interface CompressMessageToolArgs {
-    topic: string
-    content: CompressMessageEntry[]
+    /** Hidden transient model call (OpenCode V2 `session.generate`). */
+    generate: (input: { sessionID: string; prompt: string }) => Promise<string>
 }
 
 export interface BoundaryReference {
@@ -55,37 +35,6 @@ export interface SelectionResolution {
     messageTokenById: Map<string, number>
     toolIds: string[]
     requiredBlockIds: number[]
-}
-
-export interface ResolvedMessageCompression {
-    entry: CompressMessageEntry
-    selection: SelectionResolution
-    anchorMessageId: string
-}
-
-export interface ResolvedRangeCompression {
-    index: number
-    entry: CompressRangeEntry
-    selection: SelectionResolution
-    anchorMessageId: string
-}
-
-export interface ResolvedMessageCompressionsResult {
-    plans: ResolvedMessageCompression[]
-    skippedIssues: string[]
-    skippedCount: number
-}
-
-export interface ParsedBlockPlaceholder {
-    raw: string
-    blockId: number
-    startIndex: number
-    endIndex: number
-}
-
-export interface InjectedSummaryResult {
-    expandedSummary: string
-    consumedBlockIds: number[]
 }
 
 export interface AppliedCompressionResult {

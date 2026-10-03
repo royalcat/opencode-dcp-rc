@@ -3,8 +3,7 @@ import { join, dirname } from "path"
 import { homedir } from "os"
 import type { Logger } from "../logger"
 import { systemPrompt } from "./system"
-import { rangePrompt } from "./compress-range"
-import { messagePrompt } from "./compress-message"
+import { rcPrompt } from "./compress-rc"
 import type { IdFormat } from "../message-ids"
 import { CONTEXT_LIMIT_NUDGE } from "./context-limit-nudge"
 import { TURN_NUDGE } from "./turn-nudge"
@@ -13,16 +12,14 @@ import { MANUAL_MODE_SYSTEM_EXTENSION, SUBAGENT_SYSTEM_EXTENSION } from "./exten
 
 export type PromptKey =
     | "system"
-    | "compress-range"
-    | "compress-message"
+    | "compress-rc"
     | "context-limit-nudge"
     | "turn-nudge"
     | "iteration-nudge"
 
 type EditablePromptField =
     | "system"
-    | "compressRange"
-    | "compressMessage"
+    | "compressRc"
     | "contextLimitNudge"
     | "turnNudge"
     | "iterationNudge"
@@ -49,8 +46,7 @@ interface PromptPaths {
 
 export interface RuntimePrompts {
     system: string
-    compressRange: string
-    compressMessage: string
+    compressRc: string
     contextLimitNudge: string
     turnNudge: string
     iterationNudge: string
@@ -68,20 +64,12 @@ const PROMPT_DEFINITIONS: PromptDefinition[] = [
         runtimeField: "system",
     },
     {
-        key: "compress-range",
-        fileName: "compress-range.md",
-        label: "Compress Range",
-        description: "range-mode compress tool instructions and summary constraints",
-        usage: "Registered as the range-mode compress tool description",
-        runtimeField: "compressRange",
-    },
-    {
-        key: "compress-message",
-        fileName: "compress-message.md",
-        label: "Compress Message",
-        description: "message-mode compress tool instructions and summary constraints",
-        usage: "Registered as the message-mode compress tool description",
-        runtimeField: "compressMessage",
+        key: "compress-rc",
+        fileName: "compress-rc.md",
+        label: "Compress RC",
+        description: "rc-mode compress tool instructions (model selects IDs only)",
+        usage: "Registered as the rc-mode compress tool description",
+        runtimeField: "compressRc",
     },
     {
         key: "context-limit-nudge",
@@ -111,8 +99,7 @@ const PROMPT_DEFINITIONS: PromptDefinition[] = [
 
 export const PROMPT_KEYS: PromptKey[] = [
     "system",
-    "compress-range",
-    "compress-message",
+    "compress-rc",
     "context-limit-nudge",
     "turn-nudge",
     "iteration-nudge",
@@ -127,8 +114,7 @@ const DEFAULTS_README_FILE = "README.md"
 function bundledPrompts(format: IdFormat): Record<EditablePromptField, string> {
     return {
         system: systemPrompt(format),
-        compressRange: rangePrompt(format),
-        compressMessage: messagePrompt(format),
+        compressRc: rcPrompt(format),
         contextLimitNudge: CONTEXT_LIMIT_NUDGE,
         turnNudge: TURN_NUDGE,
         iterationNudge: ITERATION_NUDGE,
@@ -245,9 +231,7 @@ function toEditablePromptText(definition: PromptDefinition, rawContent: string):
         normalized = stripConditionalTag(normalized, "subagent")
     }
 
-    if (definition.key !== "compress-range" && definition.key !== "compress-message") {
-        normalized = normalizeReminderPromptContent(normalized)
-    }
+    normalized = normalizeReminderPromptContent(normalized)
 
     return normalized.trim()
 }
@@ -256,10 +240,6 @@ function wrapRuntimePromptContent(definition: PromptDefinition, editableText: st
     const trimmed = editableText.trim()
     if (!trimmed) {
         return ""
-    }
-
-    if (definition.key === "compress-range" || definition.key === "compress-message") {
-        return trimmed
     }
 
     return `<dcp-system-reminder>\n${trimmed}\n</dcp-system-reminder>`

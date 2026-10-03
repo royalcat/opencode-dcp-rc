@@ -3,12 +3,7 @@ import test from "node:test"
 import { getActiveCompressionTargets } from "../lib/commands/compression-targets"
 import { createSessionState, type CompressionBlock } from "../lib/state"
 
-function buildBlock(
-    blockId: number,
-    runId: number,
-    mode: "range" | "message",
-    durationMs: number,
-): CompressionBlock {
+function buildBlock(blockId: number, runId: number, durationMs: number): CompressionBlock {
     return {
         blockId,
         runId,
@@ -17,9 +12,9 @@ function buildBlock(
         compressedTokens: 10,
         summaryTokens: 5,
         durationMs,
-        mode,
+        mode: "rc",
         topic: `topic-${blockId}`,
-        batchTopic: mode === "message" ? `batch-${runId}` : `topic-${blockId}`,
+        batchTopic: `batch-${runId}`,
         startId: `m${blockId}`,
         endId: `m${blockId}`,
         anchorMessageId: `msg-${blockId}`,
@@ -36,11 +31,11 @@ function buildBlock(
     }
 }
 
-test("active compression targets count a grouped message run once", () => {
+test("active compression targets count each block once", () => {
     const state = createSessionState()
-    const first = buildBlock(1, 10, "message", 225)
-    const second = buildBlock(2, 10, "message", 225)
-    const third = buildBlock(3, 11, "range", 80)
+    const first = buildBlock(1, 10, 225)
+    const second = buildBlock(2, 10, 225)
+    const third = buildBlock(3, 11, 80)
 
     state.prune.messages.blocksById.set(1, first)
     state.prune.messages.blocksById.set(2, second)
@@ -52,15 +47,15 @@ test("active compression targets count a grouped message run once", () => {
     const targets = getActiveCompressionTargets(state.prune.messages)
     const totalDurationMs = targets.reduce((total, target) => total + target.durationMs, 0)
 
-    assert.equal(targets.length, 2)
-    assert.equal(totalDurationMs, 305)
+    assert.equal(targets.length, 3)
+    assert.equal(totalDurationMs, 530)
 })
 
-test("inactive grouped message runs no longer contribute compression time", () => {
+test("inactive blocks no longer contribute compression time", () => {
     const state = createSessionState()
-    const first = buildBlock(1, 10, "message", 225)
-    const second = buildBlock(2, 10, "message", 225)
-    const third = buildBlock(3, 11, "range", 80)
+    const first = buildBlock(1, 10, 225)
+    const second = buildBlock(2, 10, 225)
+    const third = buildBlock(3, 11, 80)
 
     first.active = false
     second.active = false

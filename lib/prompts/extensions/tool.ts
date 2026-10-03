@@ -4,46 +4,18 @@
 
 import type { IdFormat } from "../../message-ids"
 
-export function rangeFormat(format: IdFormat = "xml"): string {
-    const ids = format === "compact" ? "@4@ or @b1@ (include both @ characters)" : "mNNNN or bN"
+export function rcFormat(format: IdFormat = "xml"): string {
+    const single = format === "compact" ? "@4@" : "m0004"
+    const block = format === "compact" ? "@b2@" : "b2"
+    const range = format === "compact" ? "@4@-@8@" : "m0004-m0008"
     return `
 THE FORMAT OF COMPRESS
 
 \`\`\`
 {
-  topic: string,           // Short label (3-5 words) - e.g., "Auth System Exploration"
-  content: [               // One or more ranges to compress
-    {
-      startId: string,     // Boundary ID at range start: ${ids}
-      endId: string,       // Boundary ID at range end: ${ids}
-      summary: string      // Complete technical summary replacing all content in range
-    }
-  ]
+  ids: string[]   // Injected message IDs, block IDs, or inclusive ranges; each item becomes one summary
 }
-\`\`\``
-}
-
-export function messageFormat(format: IdFormat = "xml"): string {
-    const ids =
-        format === "compact"
-            ? "@4@ (include both @ characters; omit priority labels)"
-            : "mNNNN (ignore metadata attributes like priority)"
-    return `
-THE FORMAT OF COMPRESS
-
 \`\`\`
-{
-  topic: string,           // Short label (3-5 words) for the overall batch
-  content: [               // One or more messages to compress independently
-    {
-      messageId: string,   // Raw message ID only: ${ids}
-      topic: string,       // Short label (3-5 words) for this one message summary
-      summary: string      // Complete technical summary replacing that one message
-    }
-  ]
-}
-\`\`\``
-}
 
-export const RANGE_FORMAT_EXTENSION = rangeFormat()
-export const MESSAGE_FORMAT_EXTENSION = messageFormat()
+Examples: \`{"ids": ["${range}", "${single}"]}\` creates one summary for the range and a separate summary for the single message. \`{"ids": ["${block}"]}\` merges an existing compressed block into a new summary.`
+}

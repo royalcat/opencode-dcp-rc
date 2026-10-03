@@ -102,7 +102,7 @@ function formatDecompressMessage(
     const lines: string[] = []
 
     lines.push(`Restored compression ${target.displayId}.`)
-    if (target.runId !== target.displayId || target.grouped) {
+    if (target.runId !== target.displayId) {
         lines.push(`Tool call label: Compression #${target.runId}.`)
     }
     if (reactivatedBlockIds.length > 0) {
@@ -136,9 +136,7 @@ function formatAvailableBlocksMessage(availableTargets: CompressionTarget[]): st
     const entries = availableTargets.map((target) => {
         const topic = target.topic.replace(/\s+/g, " ").trim() || "(no topic)"
         const label = `${target.displayId} (${formatTokenCount(target.compressedTokens)})`
-        const details = target.grouped
-            ? `Compression #${target.runId} - ${target.blocks.length} messages`
-            : `Compression #${target.runId}`
+        const details = `Compression #${target.runId}`
         return { label, topic: `${details} - ${topic}` }
     })
 

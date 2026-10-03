@@ -1,12 +1,12 @@
 {
     "$schema": "https://json.schemastore.org/package.json",
-    "name": "@tarquinen/opencode-dcp",
-    "version": "3.2.0",
+    "name": "opencode-dcp-rc",
+    "version": "4.0.0",
     "type": "module",
     "workspaces": [
         "tests/logger"
     ],
-    "description": "OpenCode plugin that optimizes token usage by pruning obsolete tool outputs from conversation context",
+    "description": "OpenCode DCP fork: hidden context compression with a selection-only compress tool (Sleev-style)",
     "main": "./dist/index.js",
     "types": "./dist/index.d.ts",
     "exports": {
@@ -30,12 +30,12 @@
         "check:package": "npm run build && npm run verify:package",
         "prepublishOnly": "npm run check:package",
         "dev": "opencode plugin dev",
-        "sandbox": "node scripts/sandbox.mjs",
         "typecheck": "tsc --noEmit && npm run typecheck --workspace=tests/logger",
         "test": "node --import tsx --test tests/*.test.ts && npm test --workspace=tests/logger",
         "format": "prettier --write .",
         "format:check": "prettier --check .",
-        "dcp": "tsx scripts/print.ts"
+        "dcp": "tsx scripts/print.ts",
+        "lab:rc": "node scripts/lab-rc.mjs"
     },
     "keywords": [
         "opencode",
@@ -62,14 +62,14 @@
     "dependencies": {
         "@anthropic-ai/tokenizer": "^0.0.4",
         "@opencode-ai/sdk": "^1.4.3",
-        "@opentui/core": "^0.4.5",
-        "@opentui/solid": "^0.4.5",
+        "@opentui/core": "^0.5.14",
+        "@opentui/solid": "^0.5.14",
         "jsonc-parser": "^3.3.1",
         "solid-js": "^1.9.12"
     },
     "devDependencies": {
-        "@opencode-ai/plugin": "^1.18.29",
-        "@opencode/plugin": "^2.0.4",
+        "@opencode-ai/plugin": "^1.18.34",
+        "@opencode/plugin": "^2.0.22",
         "@opencode/theme": "^2.0.4",
         "@types/node": "^25.5.0",
         "prettier": "^3.8.1",

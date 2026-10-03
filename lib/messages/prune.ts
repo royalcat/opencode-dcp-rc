@@ -1,8 +1,7 @@
 import type { SessionState, WithParts } from "../state"
 import type { Logger } from "../logger"
-import type { PluginConfig } from "../config"
 import { isMessageCompacted } from "../state/utils"
-import { createSyntheticUserMessage, replaceBlockIdsWithBlocked } from "./utils"
+import { createSyntheticUserMessage } from "./utils"
 import { getLastUserMessage } from "./query"
 import type { UserMessage } from "@opencode-ai/sdk/v2"
 import { formatBlockRef } from "../message-ids"
@@ -15,11 +14,10 @@ const PRUNED_QUESTION_INPUT_REPLACEMENT = "[questions removed - see output for u
 export const prune = (
     state: SessionState,
     logger: Logger,
-    config: PluginConfig,
     messages: WithParts[],
     summaryBase?: WithParts,
 ): void => {
-    filterCompressedRanges(state, logger, config, messages, summaryBase)
+    filterCompressedRanges(state, logger, messages, summaryBase)
     // pruneFullTool(state, logger, messages)
     pruneToolOutputs(state, logger, messages)
     pruneToolInputs(state, logger, messages)
@@ -161,7 +159,6 @@ const pruneToolErrors = (state: SessionState, logger: Logger, messages: WithPart
 const filterCompressedRanges = (
     state: SessionState,
     logger: Logger,
-    config: PluginConfig,
     messages: WithParts[],
     summaryBase?: WithParts,
 ): void => {
@@ -207,10 +204,7 @@ const filterCompressedRanges = (
                             (_, id) => formatBlockRef(Number(id), "compact"),
                         )
                     }
-                    const summaryContent =
-                        config.compress.mode === "message"
-                            ? replaceBlockIdsWithBlocked(renderedSummary, state.idFormat)
-                            : renderedSummary
+                    const summaryContent = renderedSummary
                     const summarySeed = `${summary.blockId}:${summary.anchorMessageId}`
                     result.push(
                         createSyntheticUserMessage(userMessage, summaryContent, summarySeed),

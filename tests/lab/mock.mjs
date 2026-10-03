@@ -102,9 +102,22 @@ export function events(text = "MOCK_OK", call) {
 
 export async function createMock(WebSocketServer) {
     const requests = []
+    const debug = []
     function respond(body) {
         const tool = body.tools?.find((tool) => tool.name === "compress")
         const text = JSON.stringify(body.input)
+        if (text.includes("[[DCP-RC-SUMMARY]]")) {
+            const selectorsLine = text.match(/RC-SELECTORS: ([^"\\]+)/)?.[1] ?? ""
+            const selectors = selectorsLine
+                .split(",")
+                .map((value) => value.trim())
+                .filter(Boolean)
+            const reply = selectors
+                .map((selector) => `SLEEV-SUMMARY ${selector}\nLAB_SUMMARY: rc compressed context.`)
+                .join("\n\n")
+            debug.push({ kind: "summary", selectorsLine, selectors, reply })
+            return events(reply || "SLEEV-SUMMARY m0001\nLAB_SUMMARY: rc compressed context.")
+        }
         if (text.includes("You MUST summarize the conversation above"))
             return events("## Objective\nDCP_NATIVE_SUMMARY: preserve the completed test work.")
         if (!tool || text.includes("LAB_SUMMARY") || text.includes("function_call_output"))
@@ -113,6 +126,9 @@ export async function createMock(WebSocketServer) {
             text.match(/@[1-9]\d*@/)?.[0] ??
             text.match(/<dcp-message-id[^>]*>(m\d+)<\/dcp-message-id>/)?.[1]
         if (!ref) return events("MISSING_DCP_IDS")
+        const idsSchema = tool.parameters?.properties?.ids
+        debug.push({ kind: "compress", ref, idsSchema: !!idsSchema })
+        if (idsSchema) return events(undefined, { ids: [ref] })
         const message = tool.parameters?.properties?.content?.items?.properties?.messageId
         const item = message
             ? { messageId: ref, topic: "Lab", summary: "LAB_SUMMARY" }
@@ -141,6 +157,7 @@ export async function createMock(WebSocketServer) {
     return {
         url: `http://127.0.0.1:${server.address().port}/v1`,
         requests,
+        debug,
         async close() {
             for (const socket of sockets.clients) socket.terminate()
             sockets.close()

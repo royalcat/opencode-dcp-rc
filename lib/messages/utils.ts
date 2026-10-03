@@ -5,7 +5,6 @@ import type { UserMessage } from "@opencode-ai/sdk/v2"
 import type { IdFormat } from "../message-ids"
 
 const SUMMARY_ID_HASH_LENGTH = 16
-const DCP_BLOCK_ID_TAG_REGEX = /(<dcp-message-id(?=[\s>])[^>]*>)b\d+(<\/dcp-message-id>)/g
 const DCP_PAIRED_TAG_REGEX = /<dcp[^>]*>[\s\S]*?<\/dcp[^>]*>/gi
 const DCP_UNPAIRED_TAG_REGEX = /<\/?dcp[^>]*>/gi
 const INJECTED_MESSAGE_ID_SUFFIX_REGEX = /(?<=\n)<dcp-message-id[^>]*>m\d+<\/dcp-message-id>\s*$/
@@ -160,11 +159,6 @@ export function buildToolIdList(state: SessionState, messages: WithParts[]): str
     }
     state.toolIdList = toolIds
     return toolIds
-}
-
-export const replaceBlockIdsWithBlocked = (text: string, format: IdFormat = "xml"): string => {
-    if (format === "compact") return text.replace(/@b[1-9]\d*@/gi, "@blocked@")
-    return text.replace(DCP_BLOCK_ID_TAG_REGEX, "$1BLOCKED$2")
 }
 
 export const stripHallucinationsFromString = (text: string, format: IdFormat = "xml"): string => {
