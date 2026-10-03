@@ -21,6 +21,12 @@ import {
     normalizeProviderUsage,
     type CompressionUsage,
 } from "../compress/usage"
+import {
+    AisdkPartScrubber,
+    outputScrubEnabled,
+    stripAisdkResultContent,
+    type OutputScrubConfig,
+} from "./scrub"
 
 interface PendingUsage {
     provider?: CompressionUsage
@@ -115,14 +121,20 @@ function collectTexts(value: unknown, out: string[], depth = 0): void {
     }
 }
 
-function wrapLanguageModel(model: any, tracker: CompressionUsageTracker, logger: Logger): any {
+function wrapLanguageModel(
+    model: any,
+    tracker: CompressionUsageTracker,
+    logger: Logger,
+    scrub?: OutputScrubConfig,
+): any {
     return new Proxy(model, {
         get(target, property, receiver) {
             if (property === "doStream") {
-                return (options: unknown) => trackedStream(target, options, tracker, logger)
+                return (options: unknown) => trackedStream(target, options, tracker, logger, scrub)
             }
             if (property === "doGenerate") {
-                return (options: unknown) => trackedGenerate(target, options, tracker, logger)
+                return (options: unknown) =>
+                    trackedGenerate(target, options, tracker, logger, scrub)
             }
             return Reflect.get(target, property, receiver)
         },
@@ -134,23 +146,26 @@ async function trackedStream(
     options: unknown,
     tracker: CompressionUsageTracker,
     logger: Logger,
+    scrub?: OutputScrubConfig,
 ): Promise<any> {
     const result = await target.doStream(options)
     const callId = findSummaryCallId(options)
+    const scrubEnabled = !!scrub && outputScrubEnabled(scrub)
     logger.debug("Compression usage stream call", { callId: callId ?? null })
     const TransformStreamImpl = (globalThis as any).TransformStream
-    if (!callId || typeof result?.stream?.pipeThrough !== "function") {
+    if ((!callId && !scrubEnabled) || typeof result?.stream?.pipeThrough !== "function") {
         return result
     }
     if (typeof TransformStreamImpl !== "function") {
         return result
     }
 
+    const partScrubber = scrubEnabled ? new AisdkPartScrubber(scrub!) : undefined
     let recorded = false
     const transform = new TransformStreamImpl({
         transform(part: any, controller: any) {
             try {
-                if (!recorded && part?.type === "finish" && part.usage) {
+                if (callId && !recorded && part?.type === "finish" && part.usage) {
                     const usage = normalizeProviderUsage(part.usage)
                     if (usage) {
                         recorded = true
@@ -160,7 +175,10 @@ async function trackedStream(
             } catch {
                 // Never disturb the model stream because of usage accounting.
             }
-            controller.enqueue(part)
+            const parts = partScrubber ? partScrubber.process(part) : [part]
+            for (const next of parts) {
+                controller.enqueue(next)
+            }
         },
     })
     return { ...result, stream: result.stream.pipeThrough(transform) }
@@ -171,10 +189,18 @@ async function trackedGenerate(
     options: unknown,
     tracker: CompressionUsageTracker,
     logger: Logger,
+    scrub?: OutputScrubConfig,
 ): Promise<any> {
     const result = await target.doGenerate(options)
     const callId = findSummaryCallId(options)
     logger.debug("Compression usage generate call", { callId: callId ?? null })
+    if (scrub && outputScrubEnabled(scrub)) {
+        try {
+            stripAisdkResultContent(result, scrub)
+        } catch {
+            // Never disturb the model result because of output scrubbing.
+        }
+    }
     if (!callId) {
         return result
     }
@@ -193,6 +219,7 @@ export async function installCompressionUsageHook(
     ctx: Plugin.Context,
     tracker: CompressionUsageTracker,
     logger: Logger,
+    scrub?: OutputScrubConfig,
 ): Promise<void> {
     const aisdk = (ctx as any)?.aisdk
     if (!aisdk || typeof aisdk.hook !== "function") {
@@ -221,7 +248,7 @@ export async function installCompressionUsageHook(
                 if (!isModel(model)) {
                     return
                 }
-                event.language = wrapLanguageModel(model, tracker, logger)
+                event.language = wrapLanguageModel(model, tracker, logger, scrub)
             } catch (error: any) {
                 logger.debug("Compression usage hook could not wrap language model", {
                     error: error?.message,

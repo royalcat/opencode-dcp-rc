@@ -11,6 +11,7 @@ import {
     installCompressionUsageHook,
     installHttpUsageHook,
 } from "./usage"
+import { installResponseScrubHook, type OutputScrubConfig } from "./scrub"
 import { createCommandExecuteHandler, createSystemPromptHandler } from "../hooks"
 import {
     createSessionState,
@@ -62,8 +63,13 @@ export async function setup(ctx: Plugin.Context) {
     }
     const logger = new Logger(config.debug)
     const usageTracker = createCompressionUsageTracker()
-    await installCompressionUsageHook(ctx, usageTracker, logger)
+    const scrub: OutputScrubConfig = {
+        modelOutput: config.compress.scrubModelOutput,
+        messageIds: config.compress.scrubMessageIds,
+    }
+    await installCompressionUsageHook(ctx, usageTracker, logger, scrub)
     await installHttpUsageHook(ctx, usageTracker, logger)
+    await installResponseScrubHook(ctx, scrub, logger)
     const prompts = new PromptStore(
         logger,
         ctx.location.directory,

@@ -35,6 +35,8 @@ export interface CompressConfig {
     protectedTools: string[]
     protectTags: boolean
     protectUserMessages: boolean
+    scrubModelOutput: boolean
+    scrubMessageIds: boolean
 }
 
 export interface Commands {
@@ -131,6 +133,8 @@ export const VALID_CONFIG_KEYS = new Set([
     "compress.protectedTools",
     "compress.protectTags",
     "compress.protectUserMessages",
+    "compress.scrubModelOutput",
+    "compress.scrubMessageIds",
     "strategies",
     "strategies.deduplication",
     "strategies.deduplication.enabled",
@@ -433,6 +437,28 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
             }
 
             if (
+                compress.scrubModelOutput !== undefined &&
+                typeof compress.scrubModelOutput !== "boolean"
+            ) {
+                errors.push({
+                    key: "compress.scrubModelOutput",
+                    expected: "boolean",
+                    actual: typeof compress.scrubModelOutput,
+                })
+            }
+
+            if (
+                compress.scrubMessageIds !== undefined &&
+                typeof compress.scrubMessageIds !== "boolean"
+            ) {
+                errors.push({
+                    key: "compress.scrubMessageIds",
+                    expected: "boolean",
+                    actual: typeof compress.scrubMessageIds,
+                })
+            }
+
+            if (
                 typeof compress.iterationNudgeThreshold === "number" &&
                 compress.iterationNudgeThreshold < 1
             ) {
@@ -676,6 +702,8 @@ const defaultConfig: PluginConfig = {
         protectedTools: [...COMPRESS_DEFAULT_PROTECTED_TOOLS],
         protectTags: false,
         protectUserMessages: false,
+        scrubModelOutput: true,
+        scrubMessageIds: true,
     },
     strategies: {
         deduplication: {
@@ -844,6 +872,8 @@ function mergeCompress(
         protectedTools: [...new Set([...base.protectedTools, ...(override.protectedTools ?? [])])],
         protectTags: override.protectTags ?? base.protectTags,
         protectUserMessages: override.protectUserMessages ?? base.protectUserMessages,
+        scrubModelOutput: override.scrubModelOutput ?? base.scrubModelOutput,
+        scrubMessageIds: override.scrubMessageIds ?? base.scrubMessageIds,
     }
 }
 

@@ -236,6 +236,16 @@
                     "type": "boolean",
                     "default": false,
                     "description": "When enabled, your messages are marked as BLOCKED and are never included in a compression."
+                },
+                "scrubModelOutput": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Strip DCP reminder/tag blocks that the model copies into its visible reply or reasoning before the message is stored."
+                },
+                "scrubMessageIds": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Strip line-standalone compact id tags (for example \"@42@\") that the model copies into its visible reply or reasoning before the message is stored."
                 }
             },
             "default": {
@@ -249,7 +259,9 @@
                 "nudgeForce": "soft",
                 "protectedTools": [],
                 "protectTags": false,
-                "protectUserMessages": false
+                "protectUserMessages": false,
+                "scrubModelOutput": true,
+                "scrubMessageIds": true
             }
         },
         "strategies": {

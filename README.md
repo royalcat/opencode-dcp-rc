@@ -15,7 +15,9 @@ management in OpenCode.
 **Design goal: the plugin stays invisible.** Injected system prompts, message-ID
 tags, nudges, and summary replacement only ever exist in the outgoing model
 request. The user's stored history is never rewritten, and the only
-user-visible artifact is the `compress` tool call itself.
+user-visible artifact is the `compress` tool call itself. If the model echoes
+injected tags or reminders into its reply, the fork strips them from the
+response before OpenCode stores or displays it.
 
 ## How it differs from upstream DCP
 
@@ -36,6 +38,13 @@ user-visible artifact is the `compress` tool call itself.
 - **Fork names.** Package `@royalcat/opencode-dcp-rc`, config `dcp-rc.jsonc` /
   `dcp-rc.json`, and no self-update. Commands and prompt overrides keep upstream
   names: `/dcp`, `/dcp-compress`, and `dcp-prompts/overrides/`.
+
+- **Echoes are filtered.** Models sometimes copy injected reminders or message-ID
+  tags into their replies. The fork scrubs those copies from the model response
+  before OpenCode stores or displays it. Controlled by
+  `compress.scrubModelOutput` and `compress.scrubMessageIds` (both on by
+  default); it never touches tool-call arguments, so working with DCP files or
+  quoting tags intentionally still works.
 
 ## Install
 
@@ -77,6 +86,8 @@ opencode plugin add /path/to/opencode-dcp-rc
         "permission": "allow",
         "minContextLimit": 50000,
         "maxContextLimit": 100000,
+        "scrubModelOutput": true,
+        "scrubMessageIds": true,
     },
     "pruneNotification": "off",
 }
@@ -87,6 +98,11 @@ mode, subagents) still applies, except `compress.mode` and `autoUpdate`, which
 the fork no longer uses. Compress prompt text can be overridden through
 `dcp-prompts/overrides/` when `experimental.customPrompts` is enabled.
 
+`scrubModelOutput` removes DCP tags and reminder blocks the model may echo into
+its reply; `scrubMessageIds` also removes message-ID refs (`@N@`, `@bN@`,
+`@blocked@`) that appear alone on a line. Both default to `true` and are
+kill-switches only — for example to debug the raw model output.
+
 ## Status and limitations
 
 - The hidden summary call uses the session's provider/model and consumes a normal
@@ -94,6 +110,10 @@ the fork no longer uses. Compress prompt text can be overridden through
   with prefix caching can reuse it.
 - If the host rejects nested generation, the `compress` call fails visibly and the
   selection is left uncompressed so it can be retried.
+- Output scrubbing covers HTTP provider responses (OpenAI Responses/Chat,
+  Anthropic, Google) and the AI SDK text/reasoning path. Providers using the
+  experimental WebSocket transport are not covered, and copies already stored
+  before upgrading are not rewritten.
 - Forked from DCP v3.2.0. Upstream is AGPL-3.0-or-later; this fork keeps the
   same license and attribution (see `LICENSE`).
 

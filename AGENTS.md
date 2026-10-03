@@ -5,7 +5,7 @@ Working notes for agents and developers in this repository.
 ## Project
 
 - `@royalcat/opencode-dcp-rc` is a fork of [DCP](https://github.com/Tarquinen/opencode-dynamic-context-pruning)
-  (upstream v3.2.0, commit `f8232fde`), maintained by RoyalCat. Current version: **4.0.1**.
+  (upstream v3.2.0, commit `f8232fde`), maintained by RoyalCat. Current version: **4.0.2**.
 - `rc` = **RoyalCat** (fork owner initials). It is _not_ "release candidate": do not
   name versions `x.y.z-rc.N`.
 - Purpose: Make a fully local OpenCode **V2** plugin, with the plugin's internals invisible to the user.
@@ -39,8 +39,10 @@ check, typecheck, build, test, `npm audit`.
 | rc compress tool (selection-only)       | `lib/compress/rc.ts`                                                                      |
 | rc summary prompt build/parse/serialize | `lib/compress/summary.ts`                                                                 |
 | Hidden summary usage capture (V2)       | `lib/v2/usage.ts` (aisdk + http hooks, local estimates)                                   |
+| Output scrubbing (V2 response side)     | `lib/v2/scrub.ts`                                                                         |
 | Compression usage totals                | `lib/compress/usage.ts` (normalization, aggregation)                                      |
 | Compression usage tests                 | `tests/compression-usage.test.ts`                                                         |
+| Output scrub tests                      | `tests/output-scrub.test.ts`                                                              |
 | rc tool description                     | `lib/prompts/compress-rc.ts` (+ `lib/prompts/store.ts`, `lib/prompts/extensions/tool.ts`) |
 | Config loading/defaults                 | `lib/config.ts`, schema `dcp.schema.json`                                                 |
 | Message ID formats                      | `lib/message-ids.ts`                                                                      |
@@ -107,6 +109,14 @@ check, typecheck, build, test, `npm audit`.
     `/dcp stats` and the TUI Stats panel. Both paths are best-effort: registration,
     wrapping or parsing failures fall back silently to estimates, so never let them
     break a request.
+11. Response scrubbing lives in `lib/v2/scrub.ts`. Models sometimes echo injected
+    reminders or ID tags into visible replies; the plugin wraps model responses and
+    removes those echoes before OpenCode stores or displays them. SSE/JSON bodies on
+    the `http.response` hook (OpenAI Responses/Chat, Anthropic, Google) and AI SDK
+    text/reasoning parts are covered; tool-call arguments are never touched.
+    `compress.scrubModelOutput` / `compress.scrubMessageIds` (both default `true`)
+    are kill-switches. Forward-only: existing stored copies are not rewritten, and
+    WebSocket-transport providers are not covered.
 
 ## Fork conventions
 
@@ -135,7 +145,7 @@ check, typecheck, build, test, `npm audit`.
   `tests/lab/Dockerfile`: OpenCode V2 2.0.4). It builds and packs the fork, then runs
   `tests/lab/rc-run.mjs` against a mock provider inside the container. Result JSON
   looks like
-  `{"mode":"rc","hiddenSummaryRequest":true,"compressionApplied":true,"summaryRequestHasNoTools":true,...}`.
+  `{"mode":"rc","hiddenSummaryRequest":true,"compressionApplied":true,"summaryRequestHasNoTools":true,"outputScrubbed":true,...}`.
   Lab output goes to `/tmp/opencode/dcp-lab-rc/<timestamp>/`.
 - `tests/compression-usage.test.ts` covers provider usage normalization
   (`normalizeProviderUsage`), HTTP body parsing (`parseProviderUsageFromBody`: OpenAI
@@ -144,6 +154,11 @@ check, typecheck, build, test, `npm audit`.
   covers the provider and estimated paths end to end, including retry accounting.
   The lab asserts provider-sourced usage (`input_tokens: 100`, `output_tokens: 5` per
   summary request from `tests/lab/mock.mjs`) persisted into `stats.compressionUsage`.
+- `tests/output-scrub.test.ts` covers response scrubbing: cross-chunk tag and ID
+  removal, provider payload shapes, SSE/JSON transforms, tool-argument immunity,
+  aisdk parts, and the HTTP hook kill switch. The lab mock's default reply echoes a
+  `dcp-system-reminder` block and a standalone message-ID line; `rc-run.mjs` asserts
+  neither reaches CLI output or the second run's stored context.
 - Environment gotcha: some agent tool-output displays strip `@N@` tokens. Verify IDs
   and values with `grep`/`xxd` instead of trusting rendered output.
 - Known limitation kept in the fork: the V2 public plugin API does not support

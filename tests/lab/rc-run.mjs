@@ -132,12 +132,21 @@ try {
         !wire2.includes("OLD_PAYLOAD"),
         "compressed source is still present in the second run",
     )
+    assert.ok(
+        !wire2.includes("Echoed reminder body"),
+        "scrubbed reminder body persisted into stored session history",
+    )
 
     // Transparency: the compress tool call is visible, the hidden prompt is not.
     const visible = `${first}\n${second}`
     assert.match(visible, /compress/, "compress tool call is not visible in the CLI output")
     assert.ok(!visible.includes("SLEEV-SUMMARY"), "hidden summary prompt leaked into user output")
     assert.ok(!visible.includes("[[DCP-RC-SUMMARY"), "hidden marker leaked into user output")
+    const reminderScrubbed =
+        !visible.includes("dcp-system-reminder") &&
+        !visible.includes("Echoed reminder body") &&
+        !visible.includes("@521@")
+    assert.ok(reminderScrubbed, "scrubbed reminder leaked into user output")
 
     // Compression-request usage: provider telemetry from the mock is authoritative.
     const stateDir = join(root, "data", "opencode", "storage", "plugin", "dcp")
@@ -169,6 +178,7 @@ try {
             ).length,
             primaryRequestsRun2: primary2.length,
             compressionUsage: usage,
+            outputScrubbed: reminderScrubbed,
         }),
     )
 } finally {

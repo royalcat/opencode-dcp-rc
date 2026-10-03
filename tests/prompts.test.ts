@@ -115,3 +115,21 @@ test("prompt store exposes bundled rc compress prompt", () => {
         fixture.cleanup()
     }
 })
+
+test("runtime prompts discourage repeating reminders", () => {
+    const fixture = createPromptStoreFixture()
+
+    try {
+        const runtimePrompts = fixture.store.getRuntimePrompts()
+
+        assert.match(runtimePrompts.turnNudge, /Never repeat or quote this reminder/i)
+        assert.match(runtimePrompts.iterationNudge, /Never repeat or quote this reminder/i)
+        assert.match(runtimePrompts.contextLimitNudge, /Never repeat or quote this reminder/i)
+        assert.match(
+            SYSTEM_PROMPT,
+            /Do not output, quote, or mention them in your replies or reasoning/i,
+        )
+    } finally {
+        fixture.cleanup()
+    }
+})

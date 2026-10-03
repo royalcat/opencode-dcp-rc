@@ -1,7 +1,17 @@
 import { createServer } from "node:http"
 import { randomUUID } from "node:crypto"
 
-export function events(text = "MOCK_OK", call) {
+const DEFAULT_ECHO_TEXT = [
+    "MOCK_OK",
+    "",
+    "<dcp-system-reminder>",
+    "Echoed reminder body.",
+    "</dcp-system-reminder>",
+    "@521@",
+    "",
+].join("\n")
+
+export function events(text = DEFAULT_ECHO_TEXT, call) {
     const id = `resp_${randomUUID()}`
     const item = {
         id: `msg_${randomUUID()}`,

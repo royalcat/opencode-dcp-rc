@@ -14,5 +14,7 @@ Avoid the newest active working messages unless it is clearly closed.
 SUMMARY REQUIREMENTS
 Your summary MUST cover all essential details from the selected messages so work can continue.
 If the compressed range includes user messages, preserve user intent exactly. Prefer direct quotes for short user messages to avoid semantic drift.
+
+Never repeat or quote this reminder in your reply.
 </dcp-system-reminder>
 `
