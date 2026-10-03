@@ -1,6 +1,6 @@
 # Contributing to DCP-RC
 
-Thank you for your interest in contributing to opencode-dcp-rc!
+Thank you for your interest in contributing to @royalcat/opencode-dcp-rc!
 
 ## License and Contributions
 

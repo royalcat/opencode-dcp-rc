@@ -1,4 +1,4 @@
-# opencode-dcp-rc
+# @royalcat/opencode-dcp-rc
 
 A fork of [Dynamic Context Pruning](https://github.com/Tarquinen/opencode-dynamic-context-pruning)
 
@@ -33,7 +33,7 @@ user-visible artifact is the `compress` tool call itself.
   model, stored history is never rewritten, and the only visible artifact is the
   `compress` tool call and its result.
 
-- **Fork names.** Package `opencode-dcp-rc`, config `dcp-rc.jsonc` /
+- **Fork names.** Package `@royalcat/opencode-dcp-rc`, config `dcp-rc.jsonc` /
   `dcp-rc.json`, and no self-update. Commands and prompt overrides keep upstream
   names: `/dcp`, `/dcp-compress`, and `dcp-prompts/overrides/`.
 
@@ -42,14 +42,14 @@ user-visible artifact is the `compress` tool call itself.
 Requires OpenCode V2 (`@opencode/plugin` ^2.0.22; verified against 2.0.4).
 
 ```bash
-opencode plugin add opencode-dcp-rc@latest
+opencode plugin add @royalcat/opencode-dcp-rc@latest
 ```
 
 or reference the package in `opencode.json(c)`:
 
 ```jsonc
 {
-    "plugins": ["opencode-dcp-rc"],
+    "plugins": ["@royalcat/opencode-dcp-rc"],
 }
 ```
 

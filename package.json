@@ -1,6 +1,6 @@
 {
     "$schema": "https://json.schemastore.org/package.json",
-    "name": "opencode-dcp-rc",
+    "name": "@royalcat/opencode-dcp-rc",
     "version": "4.0.0",
     "type": "module",
     "workspaces": [
@@ -54,7 +54,7 @@
         "url": "https://github.com/royalcat/opencode-dcp-rc/issues"
     },
     "homepage": "https://github.com/royalcat/opencode-dcp-rc#readme",
-    "author": "tarquinen",
+    "author": "royalcat",
     "license": "AGPL-3.0-or-later",
     "peerDependencies": {
         "@opencode-ai/plugin": ">=1.18.29"

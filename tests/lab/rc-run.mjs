@@ -6,8 +6,10 @@ import { createMock } from "./mock.mjs"
 import { run } from "./process.mjs"
 
 const artifacts = await readdir("/artifacts")
-const dcpTgz = artifacts.find((name) => name.startsWith("opencode-dcp-rc") && name.endsWith(".tgz"))
-assert.ok(dcpTgz, "opencode-dcp-rc tarball not found in /artifacts")
+const dcpTgz = artifacts.find(
+    (name) => name.startsWith("royalcat-opencode-dcp-rc") && name.endsWith(".tgz"),
+)
+assert.ok(dcpTgz, "royalcat-opencode-dcp-rc tarball not found in /artifacts")
 
 await run("npm", [
     "install",
@@ -18,7 +20,7 @@ await run("npm", [
     join("/artifacts", dcpTgz),
     "ws",
 ])
-const dcp = "/lab/plugins/node_modules/opencode-dcp-rc"
+const dcp = "/lab/plugins/node_modules/@royalcat/opencode-dcp-rc"
 const require = createRequire(join("/lab/plugins", "package.json"))
 const { WebSocketServer } = require("ws")
 const mock = await createMock(WebSocketServer)

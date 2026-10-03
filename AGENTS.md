@@ -4,7 +4,7 @@ Working notes for agents and developers in this repository.
 
 ## Project
 
-- `opencode-dcp-rc` is a fork of [DCP](https://github.com/Tarquinen/opencode-dynamic-context-pruning)
+- `@royalcat/opencode-dcp-rc` is a fork of [DCP](https://github.com/Tarquinen/opencode-dynamic-context-pruning)
   (upstream v3.2.0, commit `f8232fde`), maintained by RoyalCat. Current version: **4.0.0**.
 - `rc` = **RoyalCat** (fork owner initials). It is _not_ "release candidate": do not
   name versions `x.y.z-rc.N`.
@@ -88,7 +88,7 @@ check, typecheck, build, test, `npm audit`.
 
 - Config files are `dcp-rc.jsonc` / `dcp-rc.json` (global, `$OPENCODE_CONFIG_DIR`,
   project `.opencode/`). There is no `compress.mode` or `autoUpdate` key.
-- Fork branding is limited to the package name `opencode-dcp-rc`, the RPC id
+- Fork branding is limited to the package name `@royalcat/opencode-dcp-rc`, the RPC id
   `dcp-rc` (`lib/v2/rpc.ts`), the plugin ids (`index.ts`, `tui.tsx`), and the
   config file names. Slash commands (`/dcp`, `/dcp-compress`) and prompt overrides
   (`dcp-prompts/overrides/`, `lib/prompts/store.ts`) keep upstream names; there is
