@@ -5,7 +5,7 @@ Working notes for agents and developers in this repository.
 ## Project
 
 - `@royalcat/opencode-dcp-rc` is a fork of [DCP](https://github.com/Tarquinen/opencode-dynamic-context-pruning)
-  (upstream v3.2.0, commit `f8232fde`), maintained by RoyalCat. Current version: **4.0.0**.
+  (upstream v3.2.0, commit `f8232fde`), maintained by RoyalCat. Current version: **4.0.1**.
 - `rc` = **RoyalCat** (fork owner initials). It is _not_ "release candidate": do not
   name versions `x.y.z-rc.N`.
 - Purpose: Make a fully local OpenCode **V2** plugin, with the plugin's internals invisible to the user.
@@ -38,6 +38,9 @@ check, typecheck, build, test, `npm audit`.
 | V2 plugin wiring (hooks, tool, rc)      | `lib/v2/index.ts`                                                                         |
 | rc compress tool (selection-only)       | `lib/compress/rc.ts`                                                                      |
 | rc summary prompt build/parse/serialize | `lib/compress/summary.ts`                                                                 |
+| Hidden summary usage capture (V2)       | `lib/v2/usage.ts` (aisdk + http hooks, local estimates)                                   |
+| Compression usage totals                | `lib/compress/usage.ts` (normalization, aggregation)                                      |
+| Compression usage tests                 | `tests/compression-usage.test.ts`                                                         |
 | rc tool description                     | `lib/prompts/compress-rc.ts` (+ `lib/prompts/store.ts`, `lib/prompts/extensions/tool.ts`) |
 | Config loading/defaults                 | `lib/config.ts`, schema `dcp.schema.json`                                                 |
 | Message ID formats                      | `lib/message-ids.ts`                                                                      |
@@ -57,7 +60,8 @@ check, typecheck, build, test, `npm audit`.
    compact); they are normalized internally.
 3. `lib/compress/rc.ts` resolves the selectors, validates non-overlap and block
    coverage, then performs a hidden **synchronous** `ctx.session.generate()` carrying
-   the marker `[[DCP-RC-SUMMARY]]`. There is no deferred/idle path: if generation
+   the marker `[[DCP-RC-SUMMARY:<callId>]]` (the call id attributes provider telemetry
+   back to the request). There is no deferred/idle path: if generation
    fails, the tool call fails and the selection stays untouched.
 4. `session.hook("generate")` in `lib/v2/index.ts` detects the marker and strips the
    session message context **and all tools** from that transient request. The host
@@ -83,6 +87,26 @@ check, typecheck, build, test, `npm audit`.
    (`pruneNotification`, default `off`).
 9. OpenCode V2 is required (`@opencode/plugin` ^2.0.22, verified on 2.0.4). V1 support
    and the upstream `range`/`message` modes were removed in 4.0.0.
+10. Token usage of the hidden requests is accounted for in stats: provider telemetry when
+    available, otherwise a local tokenizer estimate. `lib/v2/usage.ts` captures provider
+    usage through two paths: the `aisdk.language` hook (wraps the resolved language model
+    and reads AI SDK v3 usage from `doStream`/`doGenerate`) for AI SDK provider packages,
+    and the `http.response` hook (parses the raw body of `kind === "generate"` requests)
+    for native `@opencode/ai/providers/*` packages. Attribution goes through the call id
+    in the marker (`[[DCP-RC-SUMMARY:<callId>]]`): the tracker
+    (`createCompressionUsageTracker`) is created once per plugin setup,
+    `recordEstimatedInput` stores the generate-hook prompt estimate, and
+    `resolve(callId, text)` prefers provider telemetry, falling back to that estimate.
+    Registering the http hook makes core buffer and wrap every HTTP call for the
+    provider, so its callback must return immediately for non-`generate` kinds and never
+    throw. Parsers: `parseProviderUsageFromBody` (`lib/v2/usage.ts`) handles JSON and SSE
+    bodies for OpenAI Responses/Chat, Anthropic (cache read/write, exclusive input) and
+    Google `usageMetadata`; `normalizeProviderUsage` (`lib/compress/usage.ts`) handles
+    the AI SDK v3 shape. Totals (`CompressionUsageTotals`) live in
+    `SessionStats.compressionUsage` (session and all-time) and are surfaced by
+    `/dcp stats` and the TUI Stats panel. Both paths are best-effort: registration,
+    wrapping or parsing failures fall back silently to estimates, so never let them
+    break a request.
 
 ## Fork conventions
 
@@ -113,6 +137,13 @@ check, typecheck, build, test, `npm audit`.
   looks like
   `{"mode":"rc","hiddenSummaryRequest":true,"compressionApplied":true,"summaryRequestHasNoTools":true,...}`.
   Lab output goes to `/tmp/opencode/dcp-lab-rc/<timestamp>/`.
+- `tests/compression-usage.test.ts` covers provider usage normalization
+  (`normalizeProviderUsage`), HTTP body parsing (`parseProviderUsageFromBody`: OpenAI
+  Responses/Chat SSE, Anthropic, Google, malformed/empty bodies), estimate fallback,
+  totals aggregation, and backward-compatible persisted loads. `tests/rc.test.ts`
+  covers the provider and estimated paths end to end, including retry accounting.
+  The lab asserts provider-sourced usage (`input_tokens: 100`, `output_tokens: 5` per
+  summary request from `tests/lab/mock.mjs`) persisted into `stats.compressionUsage`.
 - Environment gotcha: some agent tool-output displays strip `@N@` tokens. Verify IDs
   and values with `grep`/`xxd` instead of trusting rendered output.
 - Known limitation kept in the fork: the V2 public plugin API does not support

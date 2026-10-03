@@ -1,4 +1,5 @@
 import type { CompressionTimingState } from "../compress/timing"
+import type { CompressionUsageTotals } from "../compress/usage"
 import type { IdFormat } from "../message-ids"
 import { Message, Part } from "@opencode-ai/sdk/v2"
 
@@ -22,6 +23,8 @@ export interface ToolParameterEntry {
 export interface SessionStats {
     pruneTokenCounter: number
     totalPruneTokens: number
+    /** Token usage of the hidden compression (summary) requests. */
+    compressionUsage: CompressionUsageTotals
 }
 
 export interface PrunedMessageEntry {

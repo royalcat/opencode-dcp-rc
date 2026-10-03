@@ -4,8 +4,13 @@ import { getConfig } from "../config"
 import { Logger } from "../logger"
 import { PromptStore } from "../prompts/store"
 import { createRcCompressTool } from "../compress"
-import { RC_SUMMARY_MARKER } from "../compress/summary"
+import { extractSummaryCallId, hasSummaryMarker } from "../compress/summary"
 import { attachCompressionDuration } from "../compress/state"
+import {
+    createCompressionUsageTracker,
+    installCompressionUsageHook,
+    installHttpUsageHook,
+} from "./usage"
 import { createCommandExecuteHandler, createSystemPromptHandler } from "../hooks"
 import {
     createSessionState,
@@ -56,6 +61,9 @@ export async function setup(ctx: Plugin.Context) {
         return
     }
     const logger = new Logger(config.debug)
+    const usageTracker = createCompressionUsageTracker()
+    await installCompressionUsageHook(ctx, usageTracker, logger)
+    await installHttpUsageHook(ctx, usageTracker, logger)
     const prompts = new PromptStore(
         logger,
         ctx.location.directory,
@@ -251,7 +259,7 @@ export async function setup(ctx: Plugin.Context) {
                     (part: any) =>
                         part?.type === "text" &&
                         typeof part.text === "string" &&
-                        part.text.includes(RC_SUMMARY_MARKER),
+                        hasSummaryMarker(part.text),
                 ),
         )
         if (own.length === 0) {
@@ -260,6 +268,32 @@ export async function setup(ctx: Plugin.Context) {
         event.messages = own as typeof event.messages
         for (const name of Object.keys(event.tools ?? {})) {
             delete (event.tools as Record<string, unknown>)[name]
+        }
+
+        // Local fallback estimate of the request input, used only when the
+        // provider usage cannot be captured from the language model wrapper.
+        const callId = own
+            .flatMap((message) =>
+                Array.isArray(message.content) ? (message.content as any[]) : [],
+            )
+            .filter((part) => part?.type === "text" && typeof part.text === "string")
+            .map((part) => extractSummaryCallId(part.text))
+            .find((id): id is string => !!id)
+        if (callId) {
+            const texts: string[] = []
+            for (const part of event.system ?? []) {
+                if (typeof (part as any)?.text === "string") {
+                    texts.push((part as any).text)
+                }
+            }
+            for (const message of own) {
+                for (const part of (message.content as any[]) ?? []) {
+                    if (part?.type === "text" && typeof part.text === "string") {
+                        texts.push(part.text)
+                    }
+                }
+            }
+            usageTracker.recordEstimatedInput(callId, countTokens(texts.join("\n")))
         }
     })
 
@@ -271,9 +305,22 @@ export async function setup(ctx: Plugin.Context) {
                 logger,
                 config,
                 prompts,
-                generate: async (input: { sessionID: string; prompt: string }) => {
-                    const result = await ctx.session.generate(input)
-                    return result?.text ?? ""
+                generate: async (input: { sessionID: string; prompt: string; callId?: string }) => {
+                    try {
+                        const result = await ctx.session.generate({
+                            sessionID: input.sessionID,
+                            prompt: input.prompt,
+                        })
+                        const text = result?.text ?? ""
+                        const usage = input.callId
+                            ? usageTracker.resolve(input.callId, text)
+                            : undefined
+                        return { text, usage }
+                    } finally {
+                        if (input.callId) {
+                            usageTracker.discard(input.callId)
+                        }
+                    }
                 },
             }
             return createRcCompressTool(context)

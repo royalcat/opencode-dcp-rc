@@ -22,6 +22,13 @@ import { saveSessionState } from "../state/persistence"
 import { rcFormat } from "../prompts/extensions/tool"
 import { appendProtectedPromptInfo, appendProtectedTools } from "./protected-content"
 import {
+    addCompressionUsage,
+    addCompressionUsageTotals,
+    emptyCompressionUsage,
+    estimatedCompressionUsage,
+    type CompressionUsageTotals,
+} from "./usage"
+import {
     buildSummaryPrompt,
     parseSummarySections,
     restoreSummary,
@@ -32,6 +39,16 @@ import {
 
 export interface RcCompressToolArgs {
     ids: string[]
+}
+
+let summaryCallCounter = 0
+
+/** Unique per hidden summary request so provider usage can be attributed. */
+function nextSummaryCallId(): string {
+    summaryCallCounter += 1
+    return `c${summaryCallCounter.toString(36)}-${Date.now().toString(36)}-${Math.random()
+        .toString(36)
+        .slice(2, 8)}`
 }
 
 /**
@@ -244,7 +261,12 @@ export function createRcCompressTool(ctx: ToolContext): ReturnType<typeof tool> 
                     priorSummaries: plan.priorSummaries,
                 }))
 
-                const text = await generateSummaries(ctx, sessionID, segments)
+                const { text, usage } = await generateSummaries(ctx, sessionID, segments)
+                ctx.state.stats.compressionUsage = addCompressionUsageTotals(
+                    ctx.state.stats.compressionUsage,
+                    usage,
+                )
+                await saveSessionState(ctx.state, ctx.logger)
                 const accepted = await resolveAcceptedSections(
                     ctx,
                     plans.map((plan) => plan.selector.selector),
@@ -290,9 +312,24 @@ async function generateSummaries(
     ctx: ToolContext,
     sessionID: string,
     segments: SummarySegment[],
-): Promise<string> {
-    const prompt = buildSummaryPrompt(segments, ctx.state.idFormat)
-    let text = await ctx.generate({ sessionID, prompt })
+): Promise<{ text: string; usage: CompressionUsageTotals }> {
+    let usage = emptyCompressionUsage()
+
+    const summarize = async (promptSegments: SummarySegment[]): Promise<string> => {
+        const callId = nextSummaryCallId()
+        const prompt = buildSummaryPrompt(promptSegments, ctx.state.idFormat, callId)
+        const result = await ctx.generate({ sessionID, prompt, callId })
+        const text = result.text ?? ""
+        // Provider usage is authoritative; fall back to a local estimate when
+        // the plugin could not observe the underlying model call.
+        usage = addCompressionUsage(
+            usage,
+            result.usage ?? estimatedCompressionUsage(countTokens(prompt), countTokens(text)),
+        )
+        return text
+    }
+
+    let text = await summarize(segments)
 
     // One retry for sections the model failed to emit.
     for (let retry = 0; retry < 2; retry++) {
@@ -311,14 +348,13 @@ async function generateSummaries(
         if (retrySegments.length === 0) {
             break
         }
-        const retryPrompt = buildSummaryPrompt(retrySegments, ctx.state.idFormat)
         try {
-            text += "\n\n" + (await ctx.generate({ sessionID, prompt: retryPrompt }))
+            text += "\n\n" + (await summarize(retrySegments))
         } catch {
             break
         }
     }
-    return text
+    return { text, usage }
 }
 
 async function resolveAcceptedSections(

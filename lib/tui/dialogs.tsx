@@ -121,6 +121,24 @@ export function StatsDialog(props: { api: ViewApi; report: StatsReport; onBack: 
                     label="Messages pruned"
                     value={`${props.report.sessionMessages}`}
                 />
+                <Metric
+                    theme={theme}
+                    label="Summary requests"
+                    value={`${props.report.sessionCompressionUsage.calls}`}
+                    hint={`${props.report.sessionCompressionUsage.providerCalls} provider · ${props.report.sessionCompressionUsage.estimatedCalls} estimated`}
+                />
+                <Metric
+                    theme={theme}
+                    label="Request in|out"
+                    value={`~${formatTokenCount(props.report.sessionCompressionUsage.inputTokens)} | ~${formatTokenCount(props.report.sessionCompressionUsage.outputTokens)}`}
+                    hint="tokens"
+                />
+                <Metric
+                    theme={theme}
+                    label="Request cache r|w"
+                    value={`~${formatTokenCount(props.report.sessionCompressionUsage.cacheReadTokens)} | ~${formatTokenCount(props.report.sessionCompressionUsage.cacheWriteTokens)}`}
+                    hint={`reasoning ~${formatTokenCount(props.report.sessionCompressionUsage.reasoningTokens)}`}
+                />
             </Card>
             <Card theme={theme} title="All time">
                 <Metric
@@ -143,6 +161,12 @@ export function StatsDialog(props: { api: ViewApi; report: StatsReport; onBack: 
                     theme={theme}
                     label="Sessions with DCP history"
                     value={`${props.report.allTime.sessionCount}`}
+                />
+                <Metric
+                    theme={theme}
+                    label="Summary requests"
+                    value={`${props.report.allTime.compressionUsage.calls}`}
+                    hint={`~${formatTokenCount(props.report.allTime.compressionUsage.inputTokens)} in · ~${formatTokenCount(props.report.allTime.compressionUsage.outputTokens)} out`}
                 />
             </Card>
         </DcpFrame>

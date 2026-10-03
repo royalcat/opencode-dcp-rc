@@ -4,8 +4,34 @@ import { formatBlockRef, formatMessageRef, parseBoundaryId, type IdFormat } from
 /**
  * Marker embedded in the hidden summary prompt so the plugin can recognize its
  * own transient (`session.generate`) request and strip everything else from it.
+ * Requests carry a per-call suffix (`[[DCP-RC-SUMMARY:<callId>]]`) so captured
+ * provider usage can be attributed to a specific request.
  */
 export const RC_SUMMARY_MARKER = "[[DCP-RC-SUMMARY]]"
+/** Prefix shared by the static marker and its per-call variant. */
+export const RC_SUMMARY_MARKER_PREFIX = "[[DCP-RC-SUMMARY"
+
+function sanitizeCallId(callId: string): string {
+    return callId.replace(/[^A-Za-z0-9_-]/g, "-")
+}
+
+/** Marker line for a hidden summary request, optionally tagged with a call id. */
+export function buildSummaryMarker(callId?: string): string {
+    if (!callId) {
+        return RC_SUMMARY_MARKER
+    }
+    return `${RC_SUMMARY_MARKER_PREFIX}:${sanitizeCallId(callId)}]]`
+}
+
+/** True when the text contains a hidden summary marker, with or without a call id. */
+export function hasSummaryMarker(text: string): boolean {
+    return text.includes(RC_SUMMARY_MARKER_PREFIX)
+}
+
+/** Extract the call id from a hidden summary marker, when present. */
+export function extractSummaryCallId(text: string): string | undefined {
+    return text.match(/\[\[DCP-RC-SUMMARY:([A-Za-z0-9_-]+)\]\]/)?.[1]
+}
 
 export interface PriorSummary {
     /** Canonical block reference, e.g. `b2` or `@b2@`. */
@@ -134,6 +160,7 @@ const SUMMARY_RULES = `RULES
 export function buildSummaryPrompt(
     selectors: SummarySegment[],
     idFormat: IdFormat = "xml",
+    callId?: string,
 ): string {
     const selectorList = selectors.map((segment) => segment.selector)
     const example = selectorList[0] ?? (idFormat === "compact" ? "" : "m0004")
@@ -152,7 +179,7 @@ export function buildSummaryPrompt(
         })
         .join("\n\n")
 
-    return `${RC_SUMMARY_MARKER}
+    return `${buildSummaryMarker(callId)}
 
 You generate compressed-context entries for a coding session. Summarize ONLY the conversation segments listed below. Do not summarize anything else and do not ask questions.
 

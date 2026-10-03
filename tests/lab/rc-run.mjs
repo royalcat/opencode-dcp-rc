@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { createRequire } from "node:module"
-import { mkdir, readdir, writeFile } from "node:fs/promises"
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { createMock } from "./mock.mjs"
 import { run } from "./process.mjs"
@@ -98,7 +98,7 @@ try {
     await writeFile(join(root, "debug-requests-run1.json"), JSON.stringify(sent1, null, 2))
     await writeFile(join(root, "debug-mock-run1.json"), JSON.stringify(mock.debug, null, 2))
     const summaryRequest = sent1.find((request) =>
-        JSON.stringify(request.body).includes("[[DCP-RC-SUMMARY]]"),
+        JSON.stringify(request.body).includes("[[DCP-RC-SUMMARY"),
     )
     assert.ok(summaryRequest, "hidden summary request was not issued")
 
@@ -137,7 +137,26 @@ try {
     const visible = `${first}\n${second}`
     assert.match(visible, /compress/, "compress tool call is not visible in the CLI output")
     assert.ok(!visible.includes("SLEEV-SUMMARY"), "hidden summary prompt leaked into user output")
-    assert.ok(!visible.includes("[[DCP-RC-SUMMARY]]"), "hidden marker leaked into user output")
+    assert.ok(!visible.includes("[[DCP-RC-SUMMARY"), "hidden marker leaked into user output")
+
+    // Compression-request usage: provider telemetry from the mock is authoritative.
+    const stateDir = join(root, "data", "opencode", "storage", "plugin", "dcp")
+    const stateFiles = await readdir(stateDir)
+    const usage = stateFiles.length
+        ? (JSON.parse(await readFile(join(stateDir, stateFiles[0]), "utf8"))?.stats
+              ?.compressionUsage ?? null)
+        : null
+    assert.ok(usage, "compression usage was not persisted")
+    assert.ok(usage.calls >= 1, "no compression requests were recorded")
+    assert.ok(usage.inputTokens > 0, "no compression input tokens were recorded")
+    assert.ok(usage.outputTokens > 0, "no compression output tokens were recorded")
+    assert.equal(
+        usage.providerCalls,
+        usage.calls,
+        "compression usage was not captured from provider telemetry",
+    )
+    assert.equal(usage.inputTokens, 100 * usage.calls)
+    assert.equal(usage.outputTokens, 5 * usage.calls)
 
     console.log(
         JSON.stringify({
@@ -149,6 +168,7 @@ try {
                 request.body.tools?.some((tool) => tool.name === "compress"),
             ).length,
             primaryRequestsRun2: primary2.length,
+            compressionUsage: usage,
         }),
     )
 } finally {

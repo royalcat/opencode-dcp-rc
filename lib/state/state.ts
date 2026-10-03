@@ -1,5 +1,6 @@
 import type { SessionState, ToolParameterEntry, WithParts } from "./types"
 import type { Logger } from "../logger"
+import { emptyCompressionUsage, normalizeCompressionUsageTotals } from "../compress/usage"
 import { applyPendingCompressionDurations } from "../compress/timing"
 import { loadManualModeSetting, loadSessionState, saveSessionState } from "./persistence"
 import {
@@ -84,6 +85,7 @@ export function createSessionState(idFormat: IdFormat = "xml"): SessionState {
         stats: {
             pruneTokenCounter: 0,
             totalPruneTokens: 0,
+            compressionUsage: emptyCompressionUsage(),
         },
         compressionTiming: {
             startsByCallId: new Map<string, number>(),
@@ -122,6 +124,7 @@ export function resetSessionState(state: SessionState): void {
     state.stats = {
         pruneTokenCounter: 0,
         totalPruneTokens: 0,
+        compressionUsage: emptyCompressionUsage(),
     }
     state.toolParameters.clear()
     state.subAgentResultCache.clear()
@@ -186,6 +189,7 @@ export async function ensureSessionInitialized(
     state.stats = {
         pruneTokenCounter: persisted.stats?.pruneTokenCounter || 0,
         totalPruneTokens: persisted.stats?.totalPruneTokens || 0,
+        compressionUsage: normalizeCompressionUsageTotals(persisted.stats?.compressionUsage),
     }
 
     const applied = applyPendingCompressionDurations(state)

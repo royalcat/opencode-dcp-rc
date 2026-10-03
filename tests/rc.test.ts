@@ -6,6 +6,7 @@ import { tmpdir } from "node:os"
 import type { WithParts } from "../lib/state"
 import type { PluginConfig } from "../lib/config"
 import type { ToolContext } from "../lib/compress/types"
+import type { CompressionUsage } from "../lib/compress/usage"
 
 const root = mkdtempSync(join(tmpdir(), "dcp-rc-"))
 process.env.XDG_DATA_HOME = join(root, "data")
@@ -23,6 +24,9 @@ const {
     parseSummarySections,
     restoreSummary,
     serializeMessageForSummary,
+    buildSummaryMarker,
+    extractSummaryCallId,
+    hasSummaryMarker,
     RC_SUMMARY_MARKER,
 } = await import("../lib/compress/summary")
 const logger = new Logger(false)
@@ -98,6 +102,7 @@ function createHarness(
         config?: PluginConfig
         reply?: (prompt: string) => string
         generateError?: Error
+        usage?: CompressionUsage
     } = {},
 ) {
     const sessionID = `ses_rc_${Date.now()}_${harnessCounter++}`
@@ -130,7 +135,7 @@ function createHarness(
             if (options.generateError) {
                 throw options.generateError
             }
-            return reply(prompt)
+            return { text: reply(prompt), usage: options.usage }
         },
     }
     const tool = createRcCompressTool(ctx)
@@ -211,6 +216,53 @@ test("rc summary prompt embeds the marker, selectors, segments and prior summari
     assert.match(prompt, /\[tool_result read\]/)
     assert.match(prompt, /### b1 \(previous compressed summary\)/)
     assert.match(prompt, /OLD SUMMARY BODY/)
+})
+
+test("rc summary marker carries the hidden request call id", () => {
+    assert.equal(buildSummaryMarker(), RC_SUMMARY_MARKER)
+    assert.equal(buildSummaryMarker("c1"), "[[DCP-RC-SUMMARY:c1]]")
+    assert.equal(hasSummaryMarker("[[DCP-RC-SUMMARY]]"), true)
+    assert.equal(hasSummaryMarker("[[DCP-RC-SUMMARY:c1]]"), true)
+    assert.equal(hasSummaryMarker("no marker here"), false)
+    assert.equal(extractSummaryCallId("x [[DCP-RC-SUMMARY:c1]] y"), "c1")
+    assert.equal(extractSummaryCallId("[[DCP-RC-SUMMARY]]"), undefined)
+    assert.ok(buildSummaryPrompt([], "xml", "c1").startsWith("[[DCP-RC-SUMMARY:c1]]"))
+})
+
+test("rc records provider usage reported for the hidden requests", async () => {
+    const usage: CompressionUsage = {
+        inputTokens: 1200,
+        outputTokens: 80,
+        cacheReadTokens: 300,
+        cacheWriteTokens: 0,
+        reasoningTokens: 12,
+        source: "provider",
+    }
+    const { state, tool, run } = createHarness({ usage })
+
+    await tool.execute({ ids: ["m0001-m0002"] }, run as any)
+
+    const totals = state.stats.compressionUsage
+    assert.equal(totals.calls, 1)
+    assert.equal(totals.providerCalls, 1)
+    assert.equal(totals.estimatedCalls, 0)
+    assert.equal(totals.inputTokens, 1200)
+    assert.equal(totals.outputTokens, 80)
+    assert.equal(totals.cacheReadTokens, 300)
+    assert.equal(totals.reasoningTokens, 12)
+})
+
+test("rc falls back to local estimates when the generator reports no usage", async () => {
+    const { state, tool, run } = createHarness()
+
+    await tool.execute({ ids: ["m0001-m0002"] }, run as any)
+
+    const totals = state.stats.compressionUsage
+    assert.equal(totals.calls, 1)
+    assert.equal(totals.providerCalls, 0)
+    assert.equal(totals.estimatedCalls, 1)
+    assert.ok(totals.inputTokens > 0)
+    assert.ok(totals.outputTokens > 0)
 })
 
 test("rc summary parsing handles block selectors, missing, duplicates and empty bodies", () => {
@@ -325,6 +377,9 @@ test("rc applies partial summaries and reports the missing selectors", async () 
     assert.match(String(result), /^Compressed: m0001-m0002\./)
     assert.match(String(result), /Not compressed: m0003-m0004\./)
     assert.equal(state.prune.messages.blocksById.size, 1)
+    // One initial attempt plus two retries for the missing selector.
+    assert.equal(state.stats.compressionUsage.calls, 3)
+    assert.equal(state.stats.compressionUsage.estimatedCalls, 3)
 })
 
 test("rc appends protected tool outputs to the generated summary", async () => {

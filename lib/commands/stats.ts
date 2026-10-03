@@ -9,6 +9,7 @@ import { sendIgnoredMessage } from "../ui/notification"
 import { formatTokenCount } from "../ui/utils"
 import { loadAllSessionStats, type AggregatedStats } from "../state/persistence"
 import { getCurrentParams } from "../token-utils"
+import { normalizeCompressionUsageTotals, type CompressionUsageTotals } from "../compress/usage"
 import { getActiveCompressionTargets } from "./compression-targets"
 
 export interface StatsCommandContext {
@@ -25,6 +26,7 @@ export function formatStatsMessage(
     sessionTools: number,
     sessionMessages: number,
     sessionDurationMs: number,
+    sessionUsage: CompressionUsageTotals,
     allTime: AggregatedStats,
 ): string {
     const lines: string[] = []
@@ -42,6 +44,16 @@ export function formatStatsMessage(
     lines.push(`  Time:             ${formatCompressionTime(sessionDurationMs)}`)
     lines.push(`  Messages:         ${sessionMessages}`)
     lines.push(`  Tools:            ${sessionTools}`)
+    lines.push(
+        `  Summary requests: ${sessionUsage.calls} (${sessionUsage.providerCalls} provider, ${sessionUsage.estimatedCalls} estimated)`,
+    )
+    lines.push(
+        `  Request in|out:   ~${formatTokenCount(sessionUsage.inputTokens)} | ~${formatTokenCount(sessionUsage.outputTokens)}`,
+    )
+    lines.push(
+        `  Request cache:    ~${formatTokenCount(sessionUsage.cacheReadTokens)} read | ~${formatTokenCount(sessionUsage.cacheWriteTokens)} write`,
+    )
+    lines.push(`  Request reason:   ~${formatTokenCount(sessionUsage.reasoningTokens)}`)
     lines.push("")
     lines.push("All-time:")
     lines.push("─".repeat(60))
@@ -49,6 +61,9 @@ export function formatStatsMessage(
     lines.push(`  Tools pruned:     ${allTime.totalTools}`)
     lines.push(`  Messages pruned:  ${allTime.totalMessages}`)
     lines.push(`  Sessions:         ${allTime.sessionCount}`)
+    lines.push(
+        `  Summary requests: ${allTime.compressionUsage.calls} (~${formatTokenCount(allTime.compressionUsage.inputTokens)} in | ~${formatTokenCount(allTime.compressionUsage.outputTokens)} out)`,
+    )
 
     return lines.join("\n")
 }
@@ -99,6 +114,7 @@ export async function handleStatsCommand(ctx: StatsCommandContext): Promise<void
         report.sessionTools,
         report.sessionMessages,
         report.sessionDurationMs,
+        report.sessionCompressionUsage,
         report.allTime,
     )
 
@@ -111,9 +127,11 @@ export async function handleStatsCommand(ctx: StatsCommandContext): Promise<void
         sessionTools: report.sessionTools,
         sessionMessages: report.sessionMessages,
         sessionDurationMs: report.sessionDurationMs,
+        sessionCompressionUsage: report.sessionCompressionUsage,
         allTimeTokens: report.allTime.totalTokens,
         allTimeTools: report.allTime.totalTools,
         allTimeMessages: report.allTime.totalMessages,
+        allTimeCompressionUsage: report.allTime.compressionUsage,
     })
 }
 
@@ -138,6 +156,8 @@ export async function buildStatsReport(state: SessionState, logger: Logger) {
     }
     const sessionTools = prunedToolIds.size
 
+    const sessionCompressionUsage = normalizeCompressionUsageTotals(state.stats.compressionUsage)
+
     let sessionMessages = 0
     for (const entry of state.prune.messages.byMessageId.values()) {
         if (entry.activeBlockIds.length > 0) {
@@ -154,6 +174,7 @@ export async function buildStatsReport(state: SessionState, logger: Logger) {
         sessionTools,
         sessionMessages,
         sessionDurationMs,
+        sessionCompressionUsage,
         allTime,
     }
 }

@@ -2,17 +2,29 @@ import { tool } from "@opencode-ai/plugin"
 
 const z = tool.schema
 const session = z.object({ sessionID: z.string() })
+const compressionUsage = z.object({
+    calls: z.number(),
+    providerCalls: z.number(),
+    estimatedCalls: z.number(),
+    inputTokens: z.number(),
+    outputTokens: z.number(),
+    cacheReadTokens: z.number(),
+    cacheWriteTokens: z.number(),
+    reasoningTokens: z.number(),
+})
 const stats = z.object({
     sessionTokens: z.number(),
     sessionSummaryTokens: z.number(),
     sessionDurationMs: z.number(),
     sessionTools: z.number(),
     sessionMessages: z.number(),
+    sessionCompressionUsage: compressionUsage,
     allTime: z.object({
         totalTokens: z.number(),
         totalTools: z.number(),
         totalMessages: z.number(),
         sessionCount: z.number(),
+        compressionUsage,
     }),
 })
 const context = z.object({

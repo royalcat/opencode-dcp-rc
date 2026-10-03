@@ -10,6 +10,12 @@ import { homedir } from "os"
 import { join } from "path"
 import type { CompressionBlock, PrunedMessageEntry, SessionState, SessionStats } from "./types"
 import type { Logger } from "../logger"
+import {
+    addCompressionUsageTotals,
+    emptyCompressionUsage,
+    normalizeCompressionUsageTotals,
+    type CompressionUsageTotals,
+} from "../compress/usage"
 import { serializePruneMessagesState } from "./utils"
 
 /** Prune state as stored on disk */
@@ -227,6 +233,7 @@ function emptyPersistedState(manualMode: boolean): PersistedSessionState {
         stats: {
             pruneTokenCounter: 0,
             totalPruneTokens: 0,
+            compressionUsage: emptyCompressionUsage(),
         },
         lastUpdated: new Date().toISOString(),
     }
@@ -257,6 +264,7 @@ export interface AggregatedStats {
     totalTools: number
     totalMessages: number
     sessionCount: number
+    compressionUsage: CompressionUsageTotals
 }
 
 export async function loadAllSessionStats(logger: Logger): Promise<AggregatedStats> {
@@ -265,6 +273,7 @@ export async function loadAllSessionStats(logger: Logger): Promise<AggregatedSta
         totalTools: 0,
         totalMessages: 0,
         sessionCount: 0,
+        compressionUsage: emptyCompressionUsage(),
     }
 
     try {
@@ -281,14 +290,21 @@ export async function loadAllSessionStats(logger: Logger): Promise<AggregatedSta
                 const content = await fs.readFile(filePath, "utf-8")
                 const state = JSON.parse(content) as PersistedSessionState
 
-                if (state?.stats?.totalPruneTokens && state?.prune) {
-                    result.totalTokens += state.stats.totalPruneTokens
+                const usage = normalizeCompressionUsageTotals(state?.stats?.compressionUsage)
+                const hasUsage = usage.calls > 0
+
+                if (state?.prune && (state?.stats?.totalPruneTokens || hasUsage)) {
+                    result.totalTokens += state.stats?.totalPruneTokens || 0
                     result.totalTools += state.prune.tools
                         ? Object.keys(state.prune.tools).length
                         : 0
                     result.totalMessages += state.prune.messages?.byMessageId
                         ? Object.keys(state.prune.messages.byMessageId).length
                         : 0
+                    result.compressionUsage = addCompressionUsageTotals(
+                        result.compressionUsage,
+                        usage,
+                    )
                     result.sessionCount++
                 }
             } catch {

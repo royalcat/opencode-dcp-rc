@@ -106,7 +106,7 @@ export async function createMock(WebSocketServer) {
     function respond(body) {
         const tool = body.tools?.find((tool) => tool.name === "compress")
         const text = JSON.stringify(body.input)
-        if (text.includes("[[DCP-RC-SUMMARY]]")) {
+        if (text.includes("[[DCP-RC-SUMMARY")) {
             const selectorsLine = text.match(/RC-SELECTORS: ([^"\\]+)/)?.[1] ?? ""
             const selectors = selectorsLine
                 .split(",")
