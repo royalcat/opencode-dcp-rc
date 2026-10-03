@@ -64,4 +64,9 @@ jobs:
 
             - name: Publish
               if: steps.package.outputs.published == 'false'
-              run: npx --yes --package npm@11 npm publish --access public --provenance
+              # setup-node@v4 exports a placeholder NODE_AUTH_TOKEN and writes an
+              # .npmrc with `_authToken=${NODE_AUTH_TOKEN}`; an empty value here
+              # lets npm fall back to OIDC trusted publishing.
+              env:
+                  NODE_AUTH_TOKEN: ""
+              run: npx --yes --package npm@^11.5.1 npm publish --access public --provenance
