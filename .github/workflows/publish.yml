@@ -69,4 +69,5 @@ jobs:
               # lets npm fall back to OIDC trusted publishing.
               env:
                   NODE_AUTH_TOKEN: ""
+                  NPM_CONFIG_LOGLEVEL: verbose
               run: npx --yes --package npm@^11.5.1 npm publish --access public --provenance
