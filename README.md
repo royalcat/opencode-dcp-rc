@@ -84,14 +84,18 @@ opencode plugin add /path/to/opencode-dcp-rc
 {
     "compress": {
         "permission": "allow",
-        "minContextLimit": 50000,
-        "maxContextLimit": 100000,
+        "minContextLimit": "20%",
+        "maxContextLimit": "80%",
         "scrubModelOutput": true,
         "scrubMessageIds": true,
     },
     "pruneNotification": "off",
 }
 ```
+
+Both context limits accept a token count or a percentage of the model's context
+window; the defaults are `"20%"` and `"80%"`, and `compress.modelMinLimits` /
+`compress.modelMaxLimits` override them per `providerID/modelID`.
 
 The rest of the upstream configuration (strategies, protection lists, manual
 mode, subagents) still applies, except `compress.mode` and `autoUpdate`, which
@@ -120,10 +124,6 @@ kill-switches only — for example to debug the raw model output.
 ---
 
 # Upstream README
-
-> **Fork note:** The upstream documentation below is kept for attribution and
-> history. This fork does not ship its `range`/`message` modes, V1 support, or
-> auto-update behavior; see the fork section above for what this package does.
 
 # Dynamic Context Pruning Plugin
 
@@ -201,16 +201,13 @@ Each level overrides the previous, so project settings take priority over global
 
 ```jsonc
 {
-    "$schema": "https://raw.githubusercontent.com/Opencode-DCP/opencode-dynamic-context-pruning/master/dcp.schema.json",
+    "$schema": "https://raw.githubusercontent.com/royalcat/opencode-dcp-rc/master/dcp.schema.json",
     // Enable or disable the plugin
     "enabled": true,
-    // Automatically update npm-installed DCP when a newer npm latest is available.
-    // Version-locked plugin specs are not updated.
-    "autoUpdate": true,
     // Enable debug logging to ~/.config/opencode/logs/dcp/
     "debug": false,
     // Notification display: "off", "minimal", or "detailed"
-    "pruneNotification": "detailed",
+    "pruneNotification": "off",
     // Notification type: "chat" (in-conversation) or "toast" (system toast)
     "pruneNotificationType": "chat",
     // Slash commands configuration
@@ -245,9 +242,6 @@ Each level overrides the previous, so project settings take priority over global
     "protectedFilePatterns": [],
     // Unified context compression tool and behavior settings
     "compress": {
-        // Compression mode: "range" (compress spans into block summaries)
-        // or experimental "message" (compress individual raw messages)
-        "mode": "range",
         // Permission mode: "allow" (no prompt), "ask" (prompt), "deny" (tool not registered)
         "permission": "allow",
         // Show compression content in a chat notification
@@ -257,11 +251,11 @@ Each level overrides the previous, so project settings take priority over global
         // Soft upper threshold: above this, DCP keeps injecting strong
         // compression nudges (based on nudgeFrequency), so compression is
         // much more likely. Accepts: number or "X%" of model context window.
-        "maxContextLimit": 100000,
+        "maxContextLimit": "80%",
         // Soft lower threshold for reminder nudges: below this, turn/iteration
         // reminders are off (compression less likely). At/above this, reminders
         // are on. Accepts: number or "X%" of model context window.
-        "minContextLimit": 50000,
+        "minContextLimit": "20%",
         // Optional per-model override for maxContextLimit by providerID/modelID.
         // If present, this wins over the global maxContextLimit.
         // Accepts: number or "X%".

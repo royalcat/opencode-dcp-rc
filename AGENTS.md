@@ -5,7 +5,7 @@ Working notes for agents and developers in this repository.
 ## Project
 
 - `@royalcat/opencode-dcp-rc` is a fork of [DCP](https://github.com/Tarquinen/opencode-dynamic-context-pruning)
-  (upstream v3.2.0, commit `f8232fde`), maintained by RoyalCat. Current version: **4.0.2**.
+  (upstream v3.2.0, commit `f8232fde`), maintained by RoyalCat. Current version: **4.0.3**.
 - `rc` = **RoyalCat** (fork owner initials). It is _not_ "release candidate": do not
   name versions `x.y.z-rc.N`.
 - Purpose: Make a fully local OpenCode **V2** plugin, with the plugin's internals invisible to the user.

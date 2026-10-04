@@ -7,7 +7,10 @@ import { createSessionState, type WithParts } from "../lib/state"
 import type { CompressionBlock } from "../lib/state"
 import { getCurrentTokenUsage } from "../lib/token-utils"
 
-function buildConfig(maxContextLimit: number, minContextLimit = 1): PluginConfig {
+function buildConfig(
+    maxContextLimit: number | `${number}%`,
+    minContextLimit: number | `${number}%` = 1,
+): PluginConfig {
     return {
         enabled: true,
         debug: false,
@@ -296,4 +299,51 @@ test("isContextOverLimits does not extend the max threshold when summaryBuffer i
     const overLimit = isContextOverLimits(config, state, undefined, undefined, messages)
 
     assert.equal(overLimit.overMaxLimit, true)
+})
+
+test("isContextOverLimits resolves percentage limits against the model context window", () => {
+    const messages = buildCompactedMessages()
+    messages.push(buildPostCompactionAssistantMessage())
+
+    const state = createSessionState()
+    state.lastCompaction = 2
+
+    const reportedTokens = 2400 + 600 + 150 + 300
+    assert.equal(getCurrentTokenUsage(state, messages), reportedTokens)
+
+    state.modelContextLimit = 4000
+    const smallWindow = isContextOverLimits(
+        buildConfig("80%", "20%"),
+        state,
+        undefined,
+        undefined,
+        messages,
+    )
+
+    assert.equal(smallWindow.overMaxLimit, true)
+    assert.equal(smallWindow.overMinLimit, true)
+
+    state.modelContextLimit = 100000
+    const largeWindow = isContextOverLimits(
+        buildConfig("80%", "20%"),
+        state,
+        undefined,
+        undefined,
+        messages,
+    )
+
+    assert.equal(largeWindow.overMaxLimit, false)
+    assert.equal(largeWindow.overMinLimit, false)
+
+    state.modelContextLimit = undefined
+    const unknownWindow = isContextOverLimits(
+        buildConfig("80%", "20%"),
+        state,
+        undefined,
+        undefined,
+        messages,
+    )
+
+    assert.equal(unknownWindow.overMaxLimit, false)
+    assert.equal(unknownWindow.overMinLimit, true)
 })
