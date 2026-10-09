@@ -133,3 +133,18 @@ test("runtime prompts discourage repeating reminders", () => {
         fixture.cleanup()
     }
 })
+
+test("prompts time compression to user turns instead of task end", () => {
+    const fixture = createPromptStoreFixture()
+
+    try {
+        const runtimePrompts = fixture.store.getRuntimePrompts()
+
+        assert.match(runtimePrompts.compressRc, /right after a user message that starts new work/i)
+        assert.match(SYSTEM_PROMPT, /WHEN TO COMPRESS/)
+        assert.match(SYSTEM_PROMPT, /Time compression to user turns/i)
+        assert.match(SYSTEM_PROMPT, /no next task is expected/i)
+    } finally {
+        fixture.cleanup()
+    }
+})

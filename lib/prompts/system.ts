@@ -22,6 +22,7 @@ A section is genuinely closed and the raw conversation has served its purpose:
 - Research concluded and findings are clear
 - Implementation finished and verified
 - Exploration exhausted and patterns understood
+- A new user message opens new work, so the ranges before it are now definitively closed
 - Dead-end noise can be discarded without waiting for a whole chapter to close
 
 DO NOT COMPRESS IF
@@ -29,6 +30,11 @@ DO NOT COMPRESS IF
 - Raw context is still relevant and needed for edits or precise references
 - The target content is still actively in progress
 - You may need exact code, error messages, or file contents in the immediate next steps
+- The current task is ending and no next task is expected, so do not compress just to tidy up
+
+WHEN TO COMPRESS
+
+Time compression to user turns. Prefer calling \`compress\` right after a user message that starts a new task, before the new work starts accumulating context. Do not treat compression as a closing ritual at the end of a task: if the task is finished and you are only waiting for the user, leave the context intact and compress once the next user message tells you what comes next. A summary with no later request to serve is wasted.
 
 Before compressing, ask: _"Is this section closed enough to become summary-only right now?"_
 

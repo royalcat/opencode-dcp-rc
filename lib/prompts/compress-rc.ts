@@ -18,6 +18,11 @@ messages over several small calls. Do not compress messages whose exact code,
 errors, or file contents may still be needed in the immediate next steps; do not
 compress work that is still active.
 
+Prefer to call it right after a user message that starts new work, when earlier
+ranges are clearly closed. If the current task is simply ending with no follow-up
+expected, there is no later request for the summary to serve, so leaving the
+context intact is fine.
+
 The summaries are generated automatically during this tool call and replace the
 selected messages in your next request.`
 }

@@ -5,7 +5,7 @@ Working notes for agents and developers in this repository.
 ## Project
 
 - `@royalcat/opencode-dcp-rc` is a fork of [DCP](https://github.com/Tarquinen/opencode-dynamic-context-pruning)
-  (upstream v3.2.0, commit `f8232fde`), maintained by RoyalCat. Current version: **4.0.3**.
+  (upstream v3.2.0, commit `f8232fde`), maintained by RoyalCat. Current version: **4.0.4**.
 - `rc` = **RoyalCat** (fork owner initials). It is _not_ "release candidate": do not
   name versions `x.y.z-rc.N`.
 - Purpose: Make a fully local OpenCode **V2** plugin, with the plugin's internals invisible to the user.
@@ -43,6 +43,7 @@ check, typecheck, build, test, `npm audit`.
 | Compression usage totals                | `lib/compress/usage.ts` (normalization, aggregation)                                      |
 | Compression usage tests                 | `tests/compression-usage.test.ts`                                                         |
 | Output scrub tests                      | `tests/output-scrub.test.ts`                                                              |
+| Injected system prompt                  | `lib/prompts/system.ts` (+ `lib/prompts/store.ts`, `lib/prompts/extensions/system.ts`)    |
 | rc tool description                     | `lib/prompts/compress-rc.ts` (+ `lib/prompts/store.ts`, `lib/prompts/extensions/tool.ts`) |
 | Config loading/defaults                 | `lib/config.ts`, schema `dcp.schema.json`                                                 |
 | Message ID formats                      | `lib/message-ids.ts`                                                                      |
@@ -117,6 +118,19 @@ check, typecheck, build, test, `npm audit`.
     `compress.scrubModelOutput` / `compress.scrubMessageIds` (both default `true`)
     are kill-switches. Forward-only: existing stored copies are not rewritten, and
     WebSocket-transport providers are not covered.
+
+12. Prompt text lives in `lib/prompts/`: `system.ts` (system prompt, injected on every
+    request), `compress-rc.ts` (the rc `compress` tool description), the `*-nudge.ts`
+    files, and `extensions/` (manual/subagent system addenda). `lib/prompts/store.ts`
+    selects bundled vs override text and exposes `RuntimePrompts`; `rc.ts` registers
+    `runtimePrompts.compressRc` as the tool description.
+13. `system.ts` and `compress-rc.ts` both carry the intentional compress-timing
+    guidance: compress right after a user message that opens new work, when earlier
+    ranges are clearly closed; do **not** treat compression as an end-of-task tidy-up
+    when no follow-up is expected (a summary with no later request to serve is
+    wasted). This is why `turn-nudge.ts` fires at user turns over `minContextLimit`.
+    `tests/prompts.test.ts` asserts the guidance with non-pinning regexes; keep the
+    wording selection-only (the model passes IDs, never summaries).
 
 ## Fork conventions
 
