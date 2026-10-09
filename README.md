@@ -76,6 +76,14 @@ npm run build
 opencode plugin add /path/to/opencode-dcp-rc
 ```
 
+### OpenChamber extension
+
+[openchamber-dcp-rc-stats](https://github.com/royalcat/openchamber-dcp-rc-stats)
+shows the same statistics — session report, active compressions, and all-time
+totals — in OpenChamber's side panel and Work Status panel. It is optional,
+read-only, and reads the plugin's persisted state; install it from
+Settings → Extensions.
+
 ## Configuration
 
 `~/.config/opencode/dcp-rc.jsonc` (created on first run):
