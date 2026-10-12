@@ -156,6 +156,8 @@ const SUMMARY_RULES = `RULES
 /**
  * Build the hidden summarization prompt. The selected segments are embedded
  * verbatim so the transient request does not depend on any injected metadata.
+ * The per-call marker goes at the end: detection scans the whole text, and a
+ * stable prefix lets retried or repeated requests reuse provider prefix caching.
  */
 export function buildSummaryPrompt(
     selectors: SummarySegment[],
@@ -179,9 +181,7 @@ export function buildSummaryPrompt(
         })
         .join("\n\n")
 
-    return `${buildSummaryMarker(callId)}
-
-You generate compressed-context entries for a coding session. Summarize ONLY the conversation segments listed below. Do not summarize anything else and do not ask questions.
+    return `You generate compressed-context entries for a coding session. Summarize ONLY the conversation segments listed below. Do not summarize anything else and do not ask questions.
 
 SUMMARY FORMAT
 SLEEV-SUMMARY ${example}
@@ -193,6 +193,8 @@ RC-SELECTORS: ${selectorList.join(", ")}
 
 SEGMENTS
 ${body}
+
+${buildSummaryMarker(callId)}
 `
 }
 

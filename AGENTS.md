@@ -63,9 +63,11 @@ check, typecheck, build, test, `npm audit`.
    compact); they are normalized internally.
 3. `lib/compress/rc.ts` resolves the selectors, validates non-overlap and block
    coverage, then performs a hidden **synchronous** `ctx.session.generate()` carrying
-   the marker `[[DCP-RC-SUMMARY:<callId>]]` (the call id attributes provider telemetry
-   back to the request). There is no deferred/idle path: if generation
-   fails, the tool call fails and the selection stays untouched.
+   the marker `[[DCP-RC-SUMMARY:<callId>]]` at the end of the prompt (detection scans
+   the whole text; the stable prefix lets retried or repeated requests reuse provider
+   prefix caching). The call id attributes provider telemetry back to the request.
+   There is no deferred/idle path: if generation fails, the tool call fails and the
+   selection stays untouched.
 4. `session.hook("generate")` in `lib/v2/index.ts` detects the marker and strips the
    session message context **and all tools** from that transient request. The host
    system prompt remains attached (byte-identical prefix of the main request, so
@@ -131,6 +133,30 @@ check, typecheck, build, test, `npm audit`.
     wasted). This is why `turn-nudge.ts` fires at user turns over `minContextLimit`.
     `tests/prompts.test.ts` asserts the guidance with non-pinning regexes; keep the
     wording selection-only (the model passes IDs, never summaries).
+
+## Explore later
+
+Open items from the 2026-10-13 compression-cost investigation (a live 4-selector
+compression billed 3 × ~149K-token hidden requests). Only the callId marker placement
+was fixed; the rest is deliberately deferred.
+
+- **Retry re-sends the whole batch.** `generateSummaries` (hardcoded 2 retries) re-sends
+  every selector when a reply parses into no sections, so a format-failing model triples
+  the request cost. Consider logging a bounded reply preview (debug) on missing/empty
+  sections to learn why parsing failed, and tolerating common header variants that
+  currently fail: en/em dash (`–`), spaces around the range separator, `SLEEV-SUMMARY:`
+  with a colon, bold/backticked/quoted headers.
+- **Reasoning inflation.** `serializeMessageForSummary` embeds stored `[reasoning]` parts
+  (31.4K of a 115.4K batch in the observed case) while `block.compressedTokens` excludes
+  them, so panels understate the hidden request. Candidate: `compress.includeReasoning`
+  (default true, skip reasoning when off).
+- **Per-run usage reporting.** Only session/all-time `compressionUsage` totals persist;
+  recording each compress run's usage (calls/in/out/reasoning/cache) on its blocks would
+  let the OpenChamber stats extension show the real request cost next to per-block
+  estimates.
+- **Caching check.** After the marker move, a retried compression should show large
+  `cacheReadTokens` relative to `inputTokens` in `/dcp stats` (before the move:
+  7,680 of 452,540).
 
 ## Fork conventions
 

@@ -209,7 +209,8 @@ test("rc summary prompt embeds the marker, selectors, segments and prior summari
         ],
         "xml",
     )
-    assert.ok(prompt.startsWith(RC_SUMMARY_MARKER))
+    assert.ok(prompt.trimEnd().endsWith(RC_SUMMARY_MARKER))
+    assert.ok(!prompt.startsWith(RC_SUMMARY_MARKER))
     assert.match(prompt, /SLEEV-SUMMARY m0004-m0005/)
     assert.match(prompt, /please fix the parser/)
     assert.match(prompt, /\[tool_call read\]/)
@@ -226,7 +227,7 @@ test("rc summary marker carries the hidden request call id", () => {
     assert.equal(hasSummaryMarker("no marker here"), false)
     assert.equal(extractSummaryCallId("x [[DCP-RC-SUMMARY:c1]] y"), "c1")
     assert.equal(extractSummaryCallId("[[DCP-RC-SUMMARY]]"), undefined)
-    assert.ok(buildSummaryPrompt([], "xml", "c1").startsWith("[[DCP-RC-SUMMARY:c1]]"))
+    assert.ok(buildSummaryPrompt([], "xml", "c1").trimEnd().endsWith("[[DCP-RC-SUMMARY:c1]]"))
 })
 
 test("rc records provider usage reported for the hidden requests", async () => {
