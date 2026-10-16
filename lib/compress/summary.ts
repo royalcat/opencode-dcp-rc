@@ -181,7 +181,7 @@ export function buildSummaryPrompt(
         })
         .join("\n\n")
 
-    return `You generate compressed-context entries for a coding session. Summarize ONLY the conversation segments listed below. Do not summarize anything else and do not ask questions.
+    return `You generate compressed-context entries for a coding session. Summarize ONLY the conversation segments listed below. Do not summarize anything else, do not ask questions, and do not call any tools.
 
 SUMMARY FORMAT
 SLEEV-SUMMARY ${example}

@@ -79,6 +79,10 @@ export async function setup(ctx: Plugin.Context) {
     const sessions = new Map<string, SessionState>()
     const queues = new Map<string, Promise<unknown>>()
     const limits = new Map<string, number>()
+    // Tool set each session's real requests carry. The hidden summary request
+    // reuses it: tools stay invisible to the user, and OpenCode's Zen free tier
+    // rejects tool-less requests as coming from outside OpenCode.
+    const sessionTools = new Map<string, Record<string, { description: string; input: unknown }>>()
     const aliases: Record<string, string> = {
         task: "subagent",
         bash: "shell",
@@ -193,6 +197,7 @@ export async function setup(ctx: Plugin.Context) {
                 )
                 if (state.isSubAgent && !config.experimental.allowSubAgents) {
                     delete event.tools.compress
+                    if (kind === "context") sessionTools.set(event.sessionID, { ...event.tools })
                     return
                 }
                 if (state.compressPermission === "deny") delete event.tools.compress
@@ -250,13 +255,17 @@ export async function setup(ctx: Plugin.Context) {
                     text,
                 }))
                 await logger.saveContext(event.sessionID, view.messages)
+                if (kind === "context") sessionTools.set(event.sessionID, { ...event.tools })
             }),
         )
 
     // Hidden summary generation for rc mode: when our marker is present, drop
-    // the session context and every tool so the transient request contains
-    // only the prompt we built. This keeps the summarization request invisible
-    // and independent of any injected metadata.
+    // the session context so the transient request contains only the prompt we
+    // built. This keeps the summarization request invisible and independent of
+    // any injected metadata. The tool set is restored from the session's own
+    // snapshot: it stays invisible to the user, and OpenCode's Zen free tier
+    // rejects tool-less requests as coming from outside OpenCode (403
+    // FreeTierError), so the request must look like the session's real ones.
     await ctx.session.hook("generate", (event) => {
         const own = event.messages.filter(
             (message) =>
@@ -272,9 +281,8 @@ export async function setup(ctx: Plugin.Context) {
             return
         }
         event.messages = own as typeof event.messages
-        for (const name of Object.keys(event.tools ?? {})) {
-            delete (event.tools as Record<string, unknown>)[name]
-        }
+        const tools = sessionTools.get(event.sessionID)
+        if (tools) event.tools = { ...tools } as typeof event.tools
 
         // Local fallback estimate of the request input, used only when the
         // provider usage cannot be captured from the language model wrapper.
@@ -299,6 +307,7 @@ export async function setup(ctx: Plugin.Context) {
                     }
                 }
             }
+            if (tools) texts.push(JSON.stringify(Object.values(tools)))
             usageTracker.recordEstimatedInput(callId, countTokens(texts.join("\n")))
         }
     })

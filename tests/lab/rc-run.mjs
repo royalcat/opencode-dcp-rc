@@ -101,6 +101,10 @@ try {
         JSON.stringify(request.body).includes("[[DCP-RC-SUMMARY"),
     )
     assert.ok(summaryRequest, "hidden summary request was not issued")
+    // The Zen free tier rejects tool-less requests as out-of-origin, so the
+    // hidden summary request must carry the session's tool set.
+    const summaryRequestTools = summaryRequest.body.tools?.length ?? 0
+    assert.ok(summaryRequestTools > 0, "hidden summary request was sent without tools")
 
     const start2 = mock.requests.length
     const second = await run(
@@ -172,7 +176,7 @@ try {
             mode: "rc",
             hiddenSummaryRequest: true,
             compressionApplied: true,
-            summaryRequestHasNoTools: !summaryRequest.body.tools?.length,
+            summaryRequestHasTools: summaryRequestTools > 0,
             primaryRequestsRun1: sent1.filter((request) =>
                 request.body.tools?.some((tool) => tool.name === "compress"),
             ).length,

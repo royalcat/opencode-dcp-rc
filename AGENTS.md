@@ -69,11 +69,15 @@ check, typecheck, build, test, `npm audit`.
    There is no deferred/idle path: if generation fails, the tool call fails and the
    selection stays untouched.
 4. `session.hook("generate")` in `lib/v2/index.ts` detects the marker and strips the
-   session message context **and all tools** from that transient request. The host
-   system prompt remains attached (byte-identical prefix of the main request, so
-   providers with prefix caching reuse it). Keep this invariant: the hidden request's
-   message context must contain only the selected segments plus formatting
-   instructions.
+   session message context from that transient request. The host system prompt remains
+   attached (byte-identical prefix of the main request, so providers with prefix caching
+   reuse it). Keep this invariant: the hidden request's message context must contain only
+   the selected segments plus formatting instructions. The **tool set must not be
+   stripped**: the hidden request carries the session's own tool snapshot (captured in the
+   `context` hook per `sessionID` in `sessionTools`), because OpenCode's Zen free tier
+   classifies a tool-less request as coming from outside OpenCode and answers it with
+   `403 FreeTierError: OpenCode's free tier can only be used from within OpenCode`. Tools
+   stay invisible to the user either way (the hidden request is never stored or shown).
 5. The reply is parsed into `SLEEV-SUMMARY <selector>` sections, protected content
    (`compress.protectedTools`, `compress.protectedFilePatterns`,
    `compress.protectTags`) is appended, and the results are applied to state and
@@ -185,7 +189,7 @@ was fixed; the rest is deliberately deferred.
   `tests/lab/Dockerfile`: OpenCode V2 2.0.4). It builds and packs the fork, then runs
   `tests/lab/rc-run.mjs` against a mock provider inside the container. Result JSON
   looks like
-  `{"mode":"rc","hiddenSummaryRequest":true,"compressionApplied":true,"summaryRequestHasNoTools":true,"outputScrubbed":true,...}`.
+  `{"mode":"rc","hiddenSummaryRequest":true,"compressionApplied":true,"summaryRequestHasTools":true,"outputScrubbed":true,...}`.
   Lab output goes to `/tmp/opencode/dcp-lab-rc/<timestamp>/`.
 - `tests/compression-usage.test.ts` covers provider usage normalization
   (`normalizeProviderUsage`), HTTP body parsing (`parseProviderUsageFromBody`: OpenAI
