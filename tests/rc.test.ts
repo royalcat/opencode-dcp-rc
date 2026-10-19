@@ -38,7 +38,7 @@ function buildConfig(overrides: Partial<PluginConfig["compress"]> = {}): PluginC
         pruneNotification: "off",
         pruneNotificationType: "chat",
         commands: { enabled: true, protectedTools: [] },
-        manualMode: { enabled: false, automaticStrategies: true },
+        manualMode: { enabled: false, automaticStrategies: true, allowCompressTool: false },
         turnProtection: { enabled: false, turns: 4 },
         experimental: { allowSubAgents: false, customPrompts: false },
         protectedFilePatterns: [],

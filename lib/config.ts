@@ -47,6 +47,7 @@ export interface Commands {
 export interface ManualModeConfig {
     enabled: boolean
     automaticStrategies: boolean
+    allowCompressTool: boolean
 }
 
 export interface PurgeErrors {
@@ -119,6 +120,7 @@ export const VALID_CONFIG_KEYS = new Set([
     "manualMode",
     "manualMode.enabled",
     "manualMode.automaticStrategies",
+    "manualMode.allowCompressTool",
     "compress",
     "compress.permission",
     "compress.showCompression",
@@ -342,6 +344,17 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
                     key: "manualMode.automaticStrategies",
                     expected: "boolean",
                     actual: typeof manualMode.automaticStrategies,
+                })
+            }
+
+            if (
+                manualMode.allowCompressTool !== undefined &&
+                typeof manualMode.allowCompressTool !== "boolean"
+            ) {
+                errors.push({
+                    key: "manualMode.allowCompressTool",
+                    expected: "boolean",
+                    actual: typeof manualMode.allowCompressTool,
                 })
             }
         }
@@ -680,6 +693,7 @@ const defaultConfig: PluginConfig = {
     manualMode: {
         enabled: false,
         automaticStrategies: true,
+        allowCompressTool: false,
     },
     turnProtection: {
         enabled: false,
@@ -900,6 +914,7 @@ function mergeManualMode(
     return {
         enabled: override.enabled ?? base.enabled,
         automaticStrategies: override.automaticStrategies ?? base.automaticStrategies,
+        allowCompressTool: override.allowCompressTool ?? base.allowCompressTool,
     }
 }
 
@@ -925,6 +940,7 @@ function deepCloneConfig(config: PluginConfig): PluginConfig {
         manualMode: {
             enabled: config.manualMode.enabled,
             automaticStrategies: config.manualMode.automaticStrategies,
+            allowCompressTool: config.manualMode.allowCompressTool,
         },
         turnProtection: { ...config.turnProtection },
         experimental: { ...config.experimental },

@@ -71,11 +71,17 @@
                     "type": "boolean",
                     "default": true,
                     "description": "When manual mode is enabled, keep automatic deduplication/purge strategies running"
+                },
+                "allowCompressTool": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "When manual mode is enabled, let the model call compress on its own when the user asks for it, instead of requiring a /dcp-compress trigger. Nudges and automatic strategies stay off either way."
                 }
             },
             "default": {
                 "enabled": false,
-                "automaticStrategies": true
+                "automaticStrategies": true,
+                "allowCompressTool": false
             }
         },
         "turnProtection": {

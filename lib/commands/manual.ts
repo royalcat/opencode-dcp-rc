@@ -17,7 +17,8 @@ import { buildCompressedBlockGuidance } from "../prompts/extensions/nudge"
 import { isIgnoredUserMessage } from "../messages/query"
 
 const MANUAL_MODE_ON = "Manual mode is now ON. Use /dcp-compress to trigger context tools manually."
-
+const MANUAL_MODE_ON_FREE =
+    "Manual mode is now ON. Automatic nudges and strategies are off; ask in chat or use /dcp-compress to compress."
 const MANUAL_MODE_OFF = "Manual mode is now OFF."
 
 const COMPRESS_TRIGGER_PROMPT = [
@@ -69,13 +70,12 @@ export async function handleManualToggleCommand(
     }
 
     const params = getCurrentParams(state, messages, logger)
-    await sendIgnoredMessage(
-        client,
-        sessionId,
-        state.manualMode ? MANUAL_MODE_ON : MANUAL_MODE_OFF,
-        params,
-        logger,
-    )
+    const message = state.manualMode
+        ? ctx.config.manualMode.allowCompressTool
+            ? MANUAL_MODE_ON_FREE
+            : MANUAL_MODE_ON
+        : MANUAL_MODE_OFF
+    await sendIgnoredMessage(client, sessionId, message, params, logger)
     await saveManualModeSetting(sessionId, !!state.manualMode, logger)
 
     logger.info("Manual mode toggled", { manualMode: state.manualMode })

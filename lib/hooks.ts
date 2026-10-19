@@ -14,7 +14,7 @@ import {
     handleStatsCommand,
     handleSweepCommand,
 } from "./commands"
-import { compressPermission } from "./compress-permission"
+import { compressPermission, manualCompressionMode } from "./compress-permission"
 import { ensureSessionInitialized } from "./state"
 
 const INTERNAL_AGENT_SIGNATURES = [
@@ -71,7 +71,7 @@ export function createSystemPromptHandler(
         const newPrompt = renderSystemPrompt(
             runtimePrompts,
             buildProtectedToolsExtension(config.compress.protectedTools),
-            !!state.manualMode,
+            manualCompressionMode(state, config),
             state.isSubAgent && config.experimental.allowSubAgents,
         )
         if (output.system.length > 0) {

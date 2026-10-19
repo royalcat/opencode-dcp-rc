@@ -3,6 +3,7 @@ import { ensureSessionInitialized, refreshManualMode } from "../state"
 import { saveSessionState } from "../state/persistence"
 import { assignMessageRefs } from "../message-ids"
 import { isIgnoredUserMessage } from "../messages/query"
+import { compressBlockedByManualMode } from "../compress-permission"
 import { deduplicate, purgeErrors } from "../strategies"
 import { getCurrentParams, getCurrentTokenUsage } from "../token-utils"
 import { sendCompressNotification } from "../ui/notification"
@@ -41,7 +42,7 @@ export async function prepareSession(
 ): Promise<PreparedSession> {
     await refreshManualMode(ctx.state, toolCtx.sessionID, ctx.logger, ctx.config.manualMode.enabled)
 
-    if (ctx.state.manualMode && ctx.state.manualMode !== "compress-pending") {
+    if (compressBlockedByManualMode(ctx.state, ctx.config)) {
         throw new Error(
             "Manual mode: compress blocked. Do not retry until `<compress triggered manually>` appears in user context.",
         )

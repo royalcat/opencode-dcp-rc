@@ -23,6 +23,7 @@ function buildConfig(
         manualMode: {
             enabled: false,
             automaticStrategies: true,
+            allowCompressTool: false,
         },
         turnProtection: {
             enabled: false,

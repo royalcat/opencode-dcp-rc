@@ -88,15 +88,23 @@ check, typecheck, build, test, `npm audit`.
    anchor).
 7. `protectUserMessages` marks user messages as `BLOCKED`: they get no visible ref,
    cannot be boundaries, and are excluded from coverage and from the hidden prompt.
-8. Invisibility invariants (design goal, not configurable): transforms apply to the
+8. Manual mode (per-session state, default from `manualMode.enabled`) turns off all
+   nudges and, with `manualMode.automaticStrategies = false`, the dedup/purge
+   strategies. `manualMode.allowCompressTool` decides whether the model may still
+   call `compress` on request (`"free"`) or only after a `/dcp-compress` trigger
+   (`"trigger-required"`); `manualCompressionMode()` in `lib/compress-permission.ts`
+   is the single gate, and it also selects the system-prompt extension. A project
+   can set the three keys in its `.opencode/dcp-rc.jsonc` to stay passive while
+   keeping manual compression; `/dcp manual` still overrides per session.
+9. Invisibility invariants (design goal, not configurable): transforms apply to the
    outgoing copy only; injected metadata (ID tags, nudges, summary prompt, markers)
    never enters stored history or user-visible output. The `compress` tool call and
    its result (the model's selectors, e.g. `Compressed: m0004-m0008.`) are the one
    intended user-visible artifact. Notifications are independent and opt-in
    (`pruneNotification`, default `off`).
-9. OpenCode V2 is required (`@opencode/plugin` ^2.0.22, verified on 2.0.4). V1 support
-   and the upstream `range`/`message` modes were removed in 4.0.0.
-10. Token usage of the hidden requests is accounted for in stats: provider telemetry when
+10. OpenCode V2 is required (`@opencode/plugin` ^2.0.22, verified on 2.0.4). V1 support
+    and the upstream `range`/`message` modes were removed in 4.0.0.
+11. Token usage of the hidden requests is accounted for in stats: provider telemetry when
     available, otherwise a local tokenizer estimate. `lib/v2/usage.ts` captures provider
     usage through two paths: the `aisdk.language` hook (wraps the resolved language model
     and reads AI SDK v3 usage from `doStream`/`doGenerate`) for AI SDK provider packages,
@@ -116,7 +124,7 @@ check, typecheck, build, test, `npm audit`.
     `/dcp stats` and the TUI Stats panel. Both paths are best-effort: registration,
     wrapping or parsing failures fall back silently to estimates, so never let them
     break a request.
-11. Response scrubbing lives in `lib/v2/scrub.ts`. Models sometimes echo injected
+12. Response scrubbing lives in `lib/v2/scrub.ts`. Models sometimes echo injected
     reminders or ID tags into visible replies; the plugin wraps model responses and
     removes those echoes before OpenCode stores or displays them. SSE/JSON bodies on
     the `http.response` hook (OpenAI Responses/Chat, Anthropic, Google) and AI SDK
@@ -125,12 +133,12 @@ check, typecheck, build, test, `npm audit`.
     are kill-switches. Forward-only: existing stored copies are not rewritten, and
     WebSocket-transport providers are not covered.
 
-12. Prompt text lives in `lib/prompts/`: `system.ts` (system prompt, injected on every
+13. Prompt text lives in `lib/prompts/`: `system.ts` (system prompt, injected on every
     request), `compress-rc.ts` (the rc `compress` tool description), the `*-nudge.ts`
     files, and `extensions/` (manual/subagent system addenda). `lib/prompts/store.ts`
     selects bundled vs override text and exposes `RuntimePrompts`; `rc.ts` registers
     `runtimePrompts.compressRc` as the tool description.
-13. `system.ts` and `compress-rc.ts` both carry the intentional compress-timing
+14. `system.ts` and `compress-rc.ts` both carry the intentional compress-timing
     guidance: compress right after a user message that opens new work, when earlier
     ranges are clearly closed; do **not** treat compression as an end-of-task tidy-up
     when no follow-up is expected (a summary with no later request to serve is

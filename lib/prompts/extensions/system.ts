@@ -11,6 +11,15 @@ Never repeat this notice in your reply.
 </dcp-system-reminder>
 `
 
+export const MANUAL_FREE_SYSTEM_EXTENSION = `<dcp-system-reminder>
+Manual compression mode is enabled. Do NOT compress proactively: no automatic nudges will ask you to, and nothing needs tidying up on your own initiative. Ignore any general guidance above about evaluating context or compressing regularly.
+
+Use the compress tool only when the user explicitly asks you to compress, summarize, or free up context in their message. When they do, select the stale ranges they mean and call compress normally.
+
+Never repeat this notice in your reply.
+</dcp-system-reminder>
+`
+
 export const SUBAGENT_SYSTEM_EXTENSION = `<dcp-system-reminder>
 You are operating in a subagent environment.
 

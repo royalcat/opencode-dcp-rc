@@ -110,6 +110,26 @@ mode, subagents) still applies, except `compress.mode` and `autoUpdate`, which
 the fork no longer uses. Compress prompt text can be overridden through
 `dcp-prompts/overrides/` when `experimental.customPrompts` is enabled.
 
+### Passive projects (manual compression only)
+
+To turn off every automatic behavior in one project while keeping compression
+available on demand, add this to that project's `.opencode/dcp-rc.jsonc`:
+
+```jsonc
+{
+    "manualMode": {
+        "enabled": true, // no turn/iteration/context-limit nudges
+        "automaticStrategies": false, // no deduplication or error purging
+        "allowCompressTool": true, // compress when you ask for it, no /dcp-compress needed
+    },
+}
+```
+
+The compress tool, message IDs, `/dcp` commands, and statistics keep working;
+only the plugin's autonomous pushes are gone. This is a project default, not a
+lock: `/dcp manual off` restores automatic behavior for the current session,
+and `/dcp manual on` switches a normal session back to passive mode.
+
 `scrubModelOutput` removes DCP tags and reminder blocks the model may echo into
 its reply; `scrubMessageIds` also removes message-ID refs (`@N@`, `@bN@`,
 `@blocked@`) that appear alone on a line. Both default to `true` and are
@@ -231,6 +251,9 @@ Each level overrides the previous, so project settings take priority over global
         // When true, automatic cleanup (deduplication, purgeErrors)
         // still runs even in manual mode
         "automaticStrategies": true,
+        // When true, the model may still call compress on its own when you
+        // ask it to in chat; when false, only /dcp-compress can trigger it
+        "allowCompressTool": false,
     },
     // Protect from pruning for <turns> message turns past tool invocation
     "turnProtection": {

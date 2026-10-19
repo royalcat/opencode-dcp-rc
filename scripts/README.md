@@ -10,14 +10,15 @@ npm run dcp -- [options]
 
 ## Options
 
-| Flag                | Description                           |
-| ------------------- | ------------------------------------- |
-| `--list`            | List available prompt keys            |
-| `--show <key>`      | Print effective prompt text for a key |
-| `--system`          | System prompt with no extensions      |
-| `--system-manual`   | System prompt with manual extension   |
-| `--system-subagent` | System prompt with subagent extension |
-| `--system-all`      | System prompt with both extensions    |
+| Flag                   | Description                                    |
+| ---------------------- | ---------------------------------------------- |
+| `--list`               | List available prompt keys                     |
+| `--show <key>`         | Print effective prompt text for a key          |
+| `--system`             | System prompt with no extensions               |
+| `--system-manual`      | System prompt with the trigger-required notice |
+| `--system-manual-free` | System prompt with the free manual notice      |
+| `--system-subagent`    | System prompt with subagent extension          |
+| `--system-all`         | System prompt with both extensions             |
 
 ## Prompt keys
 
