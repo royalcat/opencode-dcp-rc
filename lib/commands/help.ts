@@ -26,7 +26,7 @@ const TUI_COMMANDS: [string, string][] = [
 ]
 
 const TOOL_COMMANDS: Record<string, [string, string]> = {
-    compress: ["/dcp-compress [focus]", "Trigger manual compress tool execution"],
+    compress: ["/dcp-compress [focus]", "Ask the model to compress the context now"],
     decompress: ["/dcp decompress <n>", "Restore selected compression"],
     recompress: ["/dcp recompress <n>", "Re-apply a user-decompressed compression"],
 }
@@ -50,7 +50,7 @@ export function formatHelpMessage(state: SessionState, config: PluginConfig): st
     lines.push("│                              DCP Commands                               │")
     lines.push("╰─────────────────────────────────────────────────────────────────────────╯")
     lines.push("")
-    lines.push(`  ${"Manual mode:".padEnd(colWidth)}${state.manualMode ? "ON" : "OFF"}`)
+    lines.push(`  ${"Compression:".padEnd(colWidth)}${state.compressPermission ?? "allow"}`)
     lines.push("")
     lines.push("  Open the command palette for DCP modal commands.")
     lines.push("  Use /dcp-compress [focus] when you want DCP to ask the model to run compression.")

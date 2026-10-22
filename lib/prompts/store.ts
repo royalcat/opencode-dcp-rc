@@ -8,11 +8,7 @@ import type { IdFormat } from "../message-ids"
 import { CONTEXT_LIMIT_NUDGE } from "./context-limit-nudge"
 import { TURN_NUDGE } from "./turn-nudge"
 import { ITERATION_NUDGE } from "./iteration-nudge"
-import {
-    MANUAL_FREE_SYSTEM_EXTENSION,
-    MANUAL_MODE_SYSTEM_EXTENSION,
-    SUBAGENT_SYSTEM_EXTENSION,
-} from "./extensions/system"
+import { SUBAGENT_SYSTEM_EXTENSION } from "./extensions/system"
 
 export type PromptKey =
     | "system"
@@ -54,8 +50,6 @@ export interface RuntimePrompts {
     contextLimitNudge: string
     turnNudge: string
     iterationNudge: string
-    manualExtension: string
-    manualFreeExtension: string
     subagentExtension: string
 }
 
@@ -127,16 +121,12 @@ function bundledPrompts(format: IdFormat): Record<EditablePromptField, string> {
 }
 
 const INTERNAL_PROMPT_EXTENSIONS = {
-    manualExtension: MANUAL_MODE_SYSTEM_EXTENSION,
-    manualFreeExtension: MANUAL_FREE_SYSTEM_EXTENSION,
     subagentExtension: SUBAGENT_SYSTEM_EXTENSION,
 }
 
 function createBundledRuntimePrompts(bundled: Record<EditablePromptField, string>): RuntimePrompts {
     return {
         ...bundled,
-        manualExtension: INTERNAL_PROMPT_EXTENSIONS.manualExtension,
-        manualFreeExtension: INTERNAL_PROMPT_EXTENSIONS.manualFreeExtension,
         subagentExtension: INTERNAL_PROMPT_EXTENSIONS.subagentExtension,
     }
 }
@@ -234,7 +224,6 @@ function toEditablePromptText(definition: PromptDefinition, rawContent: string):
     }
 
     if (definition.key === "system") {
-        normalized = stripConditionalTag(normalized, "manual")
         normalized = stripConditionalTag(normalized, "subagent")
     }
 

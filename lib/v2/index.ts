@@ -22,7 +22,6 @@ import {
     type SessionState,
 } from "../state"
 import { assignMessageRefs } from "../message-ids"
-import { applyPendingManualTrigger } from "../commands/manual"
 import {
     buildToolIdList,
     injectCompressNudges,
@@ -150,15 +149,8 @@ export async function setup(ctx: Plugin.Context) {
             sessions.set(sessionID, state)
         }
         const messages = history(entries, session)
-        await ensureSessionInitialized(
-            client,
-            state,
-            sessionID,
-            logger,
-            messages,
-            config.manualMode.enabled,
-        )
-        await checkSession(client, state, logger, messages, config.manualMode.enabled)
+        await ensureSessionInitialized(client, state, sessionID, logger, messages)
+        await checkSession(client, state, logger, messages)
         const rule = [...agent.permissions, ...(session.permissions ?? [])].findLast(
             (rule) => matchesGlob("compress", rule.action) && matchesGlob("*", rule.resource),
         )
@@ -234,7 +226,6 @@ export async function setup(ctx: Plugin.Context) {
                     kind === "context",
                 )
                 injectMessageIds(state, config, view.messages)
-                applyPendingManualTrigger(state, view.messages, logger)
                 event.messages = view.restore()
                 const system = { system: event.system.map((part) => part.text) }
                 await createSystemPromptHandler(
@@ -384,7 +375,8 @@ export async function setup(ctx: Plugin.Context) {
             for (const name of ["dcp", "dcp-compress"])
                 editor.add({
                     name,
-                    description: name === "dcp" ? "DCP commands" : "Trigger DCP manual compression",
+                    description:
+                        name === "dcp" ? "DCP commands" : "Ask DCP to compress the context now",
                     execute: async (invocation) => {
                         const prompt = await serial(invocation.sessionID, async () => {
                             const { state } = await load(invocation.sessionID)
@@ -396,7 +388,7 @@ export async function setup(ctx: Plugin.Context) {
                             )
                                 allowed(state)
                             const output = { parts: [] }
-                            await createCommandExecuteHandler(
+                            const text = await createCommandExecuteHandler(
                                 client,
                                 state,
                                 logger,
@@ -411,11 +403,9 @@ export async function setup(ctx: Plugin.Context) {
                                 output,
                             )
                             state.compressPermission = permission
-                            const pending = state.pendingManualTrigger
-                            if (!pending) return
+                            if (!text) return
                             allowed(state)
-                            state.pendingManualTrigger = null
-                            return pending.prompt
+                            return text
                         })
                         if (prompt)
                             await ctx.session.prompt({
@@ -433,7 +423,7 @@ export async function setup(ctx: Plugin.Context) {
                 const { state, messages } = await load(sessionID)
                 syncCompressionBlocks(state, logger, messages)
                 return {
-                    manualMode: !!state.manualMode,
+                    passiveMode: config.passiveMode,
                     canCompress:
                         state.compressPermission === "allow" &&
                         (!state.isSubAgent || config.experimental.allowSubAgents),
@@ -446,13 +436,6 @@ export async function setup(ctx: Plugin.Context) {
                     context: analyzeContextTokens(state, messages),
                     stats: await buildStatsReport(state, logger),
                 }
-            }),
-        manual: ({ sessionID, enabled }) =>
-            serial(sessionID, async () => {
-                const { state } = await load(sessionID)
-                state.manualMode = enabled ? "active" : false
-                await saveSessionState(state, logger)
-                return {}
             }),
     })
     logger.info("DCP V2 initialized")

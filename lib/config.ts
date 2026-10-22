@@ -44,12 +44,6 @@ export interface Commands {
     protectedTools: string[]
 }
 
-export interface ManualModeConfig {
-    enabled: boolean
-    automaticStrategies: boolean
-    allowCompressTool: boolean
-}
-
 export interface PurgeErrors {
     enabled: boolean
     turns: number
@@ -67,12 +61,14 @@ export interface ExperimentalConfig {
 }
 
 export interface PluginConfig {
+    /** false = Off (DCP fully inactive); true = Free (compress tool + nudges). */
     enabled: boolean
+    /** Disable every periodic compression nudge while keeping the compress tool available. */
+    passiveMode: boolean
     debug: boolean
     pruneNotification: "off" | "minimal" | "detailed"
     pruneNotificationType: "chat" | "toast"
     commands: Commands
-    manualMode: ManualModeConfig
     turnProtection: TurnProtection
     experimental: ExperimentalConfig
     protectedFilePatterns: string[]
@@ -103,6 +99,7 @@ const COMPRESS_DEFAULT_PROTECTED_TOOLS = ["task", "skill", "todowrite", "todorea
 export const VALID_CONFIG_KEYS = new Set([
     "$schema",
     "enabled",
+    "passiveMode",
     "debug",
     "showUpdateToasts",
     "pruneNotification",
@@ -117,10 +114,6 @@ export const VALID_CONFIG_KEYS = new Set([
     "commands",
     "commands.enabled",
     "commands.protectedTools",
-    "manualMode",
-    "manualMode.enabled",
-    "manualMode.automaticStrategies",
-    "manualMode.allowCompressTool",
     "compress",
     "compress.permission",
     "compress.showCompression",
@@ -181,6 +174,14 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
 
     if (config.enabled !== undefined && typeof config.enabled !== "boolean") {
         errors.push({ key: "enabled", expected: "boolean", actual: typeof config.enabled })
+    }
+
+    if (config.passiveMode !== undefined && typeof config.passiveMode !== "boolean") {
+        errors.push({
+            key: "passiveMode",
+            expected: "boolean",
+            actual: typeof config.passiveMode,
+        })
     }
 
     if (config.debug !== undefined && typeof config.debug !== "boolean") {
@@ -314,47 +315,6 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
                     key: "commands.protectedTools",
                     expected: "string[]",
                     actual: typeof commands.protectedTools,
-                })
-            }
-        }
-    }
-
-    const manualMode = config.manualMode
-    if (manualMode !== undefined) {
-        if (typeof manualMode !== "object" || manualMode === null || Array.isArray(manualMode)) {
-            errors.push({
-                key: "manualMode",
-                expected: "object",
-                actual: typeof manualMode,
-            })
-        } else {
-            if (manualMode.enabled !== undefined && typeof manualMode.enabled !== "boolean") {
-                errors.push({
-                    key: "manualMode.enabled",
-                    expected: "boolean",
-                    actual: typeof manualMode.enabled,
-                })
-            }
-
-            if (
-                manualMode.automaticStrategies !== undefined &&
-                typeof manualMode.automaticStrategies !== "boolean"
-            ) {
-                errors.push({
-                    key: "manualMode.automaticStrategies",
-                    expected: "boolean",
-                    actual: typeof manualMode.automaticStrategies,
-                })
-            }
-
-            if (
-                manualMode.allowCompressTool !== undefined &&
-                typeof manualMode.allowCompressTool !== "boolean"
-            ) {
-                errors.push({
-                    key: "manualMode.allowCompressTool",
-                    expected: "boolean",
-                    actual: typeof manualMode.allowCompressTool,
                 })
             }
         }
@@ -683,17 +643,13 @@ function showConfigWarnings(
 
 const defaultConfig: PluginConfig = {
     enabled: true,
+    passiveMode: false,
     debug: false,
     pruneNotification: "off",
     pruneNotificationType: "chat",
     commands: {
         enabled: true,
         protectedTools: [...DEFAULT_PROTECTED_TOOLS],
-    },
-    manualMode: {
-        enabled: false,
-        automaticStrategies: true,
-        allowCompressTool: false,
     },
     turnProtection: {
         enabled: false,
@@ -905,19 +861,6 @@ function mergeCommands(
     }
 }
 
-function mergeManualMode(
-    base: PluginConfig["manualMode"],
-    override?: Partial<PluginConfig["manualMode"]>,
-): PluginConfig["manualMode"] {
-    if (override === undefined) return base
-
-    return {
-        enabled: override.enabled ?? base.enabled,
-        automaticStrategies: override.automaticStrategies ?? base.automaticStrategies,
-        allowCompressTool: override.allowCompressTool ?? base.allowCompressTool,
-    }
-}
-
 function mergeExperimental(
     base: PluginConfig["experimental"],
     override?: Partial<PluginConfig["experimental"]>,
@@ -936,11 +879,6 @@ function deepCloneConfig(config: PluginConfig): PluginConfig {
         commands: {
             enabled: config.commands.enabled,
             protectedTools: [...config.commands.protectedTools],
-        },
-        manualMode: {
-            enabled: config.manualMode.enabled,
-            automaticStrategies: config.manualMode.automaticStrategies,
-            allowCompressTool: config.manualMode.allowCompressTool,
         },
         turnProtection: { ...config.turnProtection },
         experimental: { ...config.experimental },
@@ -967,11 +905,11 @@ function deepCloneConfig(config: PluginConfig): PluginConfig {
 function mergeLayer(config: PluginConfig, data: Record<string, any>): PluginConfig {
     return {
         enabled: data.enabled ?? config.enabled,
+        passiveMode: data.passiveMode ?? config.passiveMode,
         debug: data.debug ?? config.debug,
         pruneNotification: data.pruneNotification ?? config.pruneNotification,
         pruneNotificationType: data.pruneNotificationType ?? config.pruneNotificationType,
         commands: mergeCommands(config.commands, data.commands as any),
-        manualMode: mergeManualMode(config.manualMode, data.manualMode as any),
         turnProtection: {
             enabled: data.turnProtection?.enabled ?? config.turnProtection.enabled,
             turns: data.turnProtection?.turns ?? config.turnProtection.turns,

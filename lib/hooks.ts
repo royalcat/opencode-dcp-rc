@@ -8,13 +8,12 @@ import {
     handleContextCommand,
     handleDecompressCommand,
     handleHelpCommand,
-    handleManualToggleCommand,
-    handleManualTriggerCommand,
+    handleCompressCommand,
     handleRecompressCommand,
     handleStatsCommand,
     handleSweepCommand,
 } from "./commands"
-import { compressPermission, manualCompressionMode } from "./compress-permission"
+import { compressPermission } from "./compress-permission"
 import { ensureSessionInitialized } from "./state"
 
 const INTERNAL_AGENT_SIGNATURES = [
@@ -71,7 +70,6 @@ export function createSystemPromptHandler(
         const newPrompt = renderSystemPrompt(
             runtimePrompts,
             buildProtectedToolsExtension(config.compress.protectedTools),
-            manualCompressionMode(state, config),
             state.isSubAgent && config.experimental.allowSubAgents,
         )
         if (output.system.length > 0) {
@@ -103,14 +101,7 @@ export function createCommandExecuteHandler(
             })
             const messages: WithParts[] = filterMessages(messagesResponse.data || messagesResponse)
 
-            await ensureSessionInitialized(
-                client,
-                state,
-                input.sessionID,
-                logger,
-                messages,
-                config.manualMode.enabled,
-            )
+            await ensureSessionInitialized(client, state, input.sessionID, logger, messages)
 
             const effectivePermission = compressPermission(state, config)
             if (effectivePermission === "deny") {
@@ -150,23 +141,10 @@ export function createCommandExecuteHandler(
                 return
             }
 
-            if (subcommand === "manual") {
-                await handleManualToggleCommand(commandCtx, subArgs[0]?.toLowerCase())
-                return
-            }
-
             if (subcommand === "compress") {
                 const userFocus = subArgs.join(" ").trim()
-                const prompt = await handleManualTriggerCommand(commandCtx, "compress", userFocus)
-                if (!prompt) {
-                    throw new Error("__DCP_MANUAL_TRIGGER_BLOCKED__")
-                }
+                const prompt = await handleCompressCommand(commandCtx, userFocus)
 
-                state.manualMode = "compress-pending"
-                state.pendingManualTrigger = {
-                    sessionId: input.sessionID,
-                    prompt,
-                }
                 const rawArgs = (input.arguments || "").trim()
                 output.parts.length = 0
                 output.parts.push({
@@ -179,7 +157,7 @@ export function createCommandExecuteHandler(
                           ? `/dcp ${rawArgs}`
                           : `/dcp ${subcommand}`,
                 })
-                return
+                return prompt
             }
 
             if (subcommand === "decompress") {

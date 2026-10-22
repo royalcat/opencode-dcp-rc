@@ -1,9 +1,8 @@
 import type { WithParts } from "../state"
-import { ensureSessionInitialized, refreshManualMode } from "../state"
+import { ensureSessionInitialized } from "../state"
 import { saveSessionState } from "../state/persistence"
 import { assignMessageRefs } from "../message-ids"
 import { isIgnoredUserMessage } from "../messages/query"
-import { compressBlockedByManualMode } from "../compress-permission"
 import { deduplicate, purgeErrors } from "../strategies"
 import { getCurrentParams, getCurrentTokenUsage } from "../token-utils"
 import { sendCompressNotification } from "../ui/notification"
@@ -40,14 +39,6 @@ export async function prepareSession(
     toolCtx: RunContext,
     title: string,
 ): Promise<PreparedSession> {
-    await refreshManualMode(ctx.state, toolCtx.sessionID, ctx.logger, ctx.config.manualMode.enabled)
-
-    if (compressBlockedByManualMode(ctx.state, ctx.config)) {
-        throw new Error(
-            "Manual mode: compress blocked. Do not retry until `<compress triggered manually>` appears in user context.",
-        )
-    }
-
     await toolCtx.ask({
         permission: "compress",
         patterns: ["*"],
@@ -65,7 +56,6 @@ export async function prepareSession(
         toolCtx.sessionID,
         ctx.logger,
         rawMessages,
-        ctx.config.manualMode.enabled,
     )
 
     assignMessageRefs(ctx.state, rawMessages)
@@ -86,15 +76,6 @@ export async function finalizeSession(
     entries: NotificationEntry[],
     batchTopic: string | undefined,
 ): Promise<void> {
-    if (ctx.state.manualMode === "compress-pending") {
-        ctx.state.manualMode = false
-        await refreshManualMode(
-            ctx.state,
-            toolCtx.sessionID,
-            ctx.logger,
-            ctx.config.manualMode.enabled,
-        )
-    }
     applyPendingCompressionDurations(ctx.state)
     await saveSessionState(ctx.state, ctx.logger)
 

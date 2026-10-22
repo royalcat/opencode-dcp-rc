@@ -1,50 +1,22 @@
 /**
- * DCP Manual mode command handler.
- * Handles toggling manual mode and triggering individual tool executions.
+ * DCP manual compression snippet.
  *
- * Usage:
- *   /dcp manual [on|off]  - Toggle manual mode or set explicit state
- *   /dcp-compress [focus]  - Trigger manual compress execution
+ * `/dcp-compress` only sends an instruction that asks the model to compress;
+ * there is no trigger state, gate, or per-call limit. The compress tool is
+ * always available while the plugin is enabled.
  */
 
 import type { Logger } from "../logger"
 import type { SessionState, WithParts } from "../state"
 import type { PluginConfig } from "../config"
-import { sendIgnoredMessage } from "../ui/notification"
-import { saveManualModeSetting } from "../state/persistence"
-import { getCurrentParams } from "../token-utils"
 import { buildCompressedBlockGuidance } from "../prompts/extensions/nudge"
-import { isIgnoredUserMessage } from "../messages/query"
 
-const MANUAL_MODE_ON = "Manual mode is now ON. Use /dcp-compress to trigger context tools manually."
-const MANUAL_MODE_ON_FREE =
-    "Manual mode is now ON. Automatic nudges and strategies are off; ask in chat or use /dcp-compress to compress."
-const MANUAL_MODE_OFF = "Manual mode is now OFF."
-
-const COMPRESS_TRIGGER_PROMPT = [
-    "<compress triggered manually>",
-    "Manual mode trigger received. You must now use the compress tool.",
-    "Find the most significant completed conversation content that can be compressed into a high-fidelity technical summary.",
-    "Follow the active compress mode, preserve all critical implementation details, and choose safe targets.",
-    "Return after compress with a brief explanation of what content was compressed.",
+const COMPRESS_SNIPPET = [
+    "Compress the significant completed conversation content into high-fidelity technical summaries.",
+    "Find the most significant completed content that can be compressed, preserve all critical implementation details, and choose safe targets.",
+    "Prefer one broad selection. Use more than one compress call only for independent selections, and never call compress in parallel.",
+    "Return after compressing with a brief explanation of what content was compressed.",
 ].join("\n\n")
-
-function getTriggerPrompt(
-    tool: "compress",
-    state: SessionState,
-    config: PluginConfig,
-    userFocus?: string,
-): string {
-    const base = COMPRESS_TRIGGER_PROMPT
-    const compressedBlockGuidance = buildCompressedBlockGuidance(state)
-
-    const sections = [base, compressedBlockGuidance]
-    if (userFocus && userFocus.trim().length > 0) {
-        sections.push(`Additional user focus:\n${userFocus.trim()}`)
-    }
-
-    return sections.join("\n\n")
-}
 
 export interface ManualCommandContext {
     client: any
@@ -55,72 +27,18 @@ export interface ManualCommandContext {
     messages: WithParts[]
 }
 
-export async function handleManualToggleCommand(
-    ctx: ManualCommandContext,
-    modeArg?: string,
-): Promise<void> {
-    const { client, state, logger, sessionId, messages } = ctx
-
-    if (modeArg === "on") {
-        state.manualMode = "active"
-    } else if (modeArg === "off") {
-        state.manualMode = false
-    } else {
-        state.manualMode = state.manualMode ? false : "active"
+export function buildCompressSnippet(state: SessionState, userFocus?: string): string {
+    const sections = [COMPRESS_SNIPPET, buildCompressedBlockGuidance(state)]
+    if (userFocus && userFocus.trim().length > 0) {
+        sections.push(`Additional user focus:\n${userFocus.trim()}`)
     }
 
-    const params = getCurrentParams(state, messages, logger)
-    const message = state.manualMode
-        ? ctx.config.manualMode.allowCompressTool
-            ? MANUAL_MODE_ON_FREE
-            : MANUAL_MODE_ON
-        : MANUAL_MODE_OFF
-    await sendIgnoredMessage(client, sessionId, message, params, logger)
-    await saveManualModeSetting(sessionId, !!state.manualMode, logger)
-
-    logger.info("Manual mode toggled", { manualMode: state.manualMode })
+    return sections.join("\n\n")
 }
 
-export async function handleManualTriggerCommand(
+export async function handleCompressCommand(
     ctx: ManualCommandContext,
-    tool: "compress",
     userFocus?: string,
-): Promise<string | null> {
-    return getTriggerPrompt(tool, ctx.state, ctx.config, userFocus)
-}
-
-export function applyPendingManualTrigger(
-    state: SessionState,
-    messages: WithParts[],
-    logger: Logger,
-): void {
-    const pending = state.pendingManualTrigger
-    if (!pending) {
-        return
-    }
-
-    if (!state.sessionId || pending.sessionId !== state.sessionId) {
-        state.pendingManualTrigger = null
-        return
-    }
-
-    for (let i = messages.length - 1; i >= 0; i--) {
-        const msg = messages[i]
-        if (msg.info.role !== "user" || isIgnoredUserMessage(msg)) {
-            continue
-        }
-
-        for (const part of msg.parts) {
-            if (part.type !== "text" || part.ignored || part.synthetic) {
-                continue
-            }
-
-            part.text = pending.prompt
-            state.pendingManualTrigger = null
-            logger.debug("Applied manual prompt", { sessionId: pending.sessionId })
-            return
-        }
-    }
-
-    state.pendingManualTrigger = null
+): Promise<string> {
+    return buildCompressSnippet(ctx.state, userFocus)
 }

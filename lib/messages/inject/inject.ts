@@ -41,7 +41,17 @@ export const injectCompressNudges = (
         return
     }
 
-    if (state.manualMode) {
+    if (config.passiveMode) {
+        if (
+            state.nudges.contextLimitAnchors.size > 0 ||
+            state.nudges.turnNudgeAnchors.size > 0 ||
+            state.nudges.iterationNudgeAnchors.size > 0
+        ) {
+            state.nudges.contextLimitAnchors.clear()
+            state.nudges.turnNudgeAnchors.clear()
+            state.nudges.iterationNudgeAnchors.clear()
+            void saveSessionState(state, logger)
+        }
         return
     }
 

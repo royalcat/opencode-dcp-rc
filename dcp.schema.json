@@ -14,7 +14,12 @@
         "enabled": {
             "type": "boolean",
             "default": true,
-            "description": "Enable or disable the DCP plugin"
+            "description": "Off when false (DCP fully inactive: no compress tool, no nudges, no strategies). Free when true: the compress tool is always available and nudges/strategies follow their own settings."
+        },
+        "passiveMode": {
+            "type": "boolean",
+            "default": false,
+            "description": "Suppress every periodic compression nudge while keeping the compress tool available. Deduplication/purge strategies and the base system prompt are unchanged."
         },
         "debug": {
             "type": "boolean",
@@ -55,33 +60,6 @@
             "default": {
                 "enabled": true,
                 "protectedTools": []
-            }
-        },
-        "manualMode": {
-            "type": "object",
-            "description": "Manual mode behavior for context management tools",
-            "additionalProperties": false,
-            "properties": {
-                "enabled": {
-                    "type": "boolean",
-                    "default": false,
-                    "description": "Start new sessions with manual mode enabled"
-                },
-                "automaticStrategies": {
-                    "type": "boolean",
-                    "default": true,
-                    "description": "When manual mode is enabled, keep automatic deduplication/purge strategies running"
-                },
-                "allowCompressTool": {
-                    "type": "boolean",
-                    "default": false,
-                    "description": "When manual mode is enabled, let the model call compress on its own when the user asks for it, instead of requiring a /dcp-compress trigger. Nudges and automatic strategies stay off either way."
-                }
-            },
-            "default": {
-                "enabled": false,
-                "automaticStrategies": true,
-                "allowCompressTool": false
             }
         },
         "turnProtection": {

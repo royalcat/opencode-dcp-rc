@@ -41,7 +41,6 @@ export interface PersistedNudges {
 
 export interface PersistedSessionState {
     sessionName?: string
-    manualMode?: boolean
     prune: PersistedPrune
     nudges: PersistedNudges
     stats: SessionStats
@@ -95,7 +94,6 @@ export async function saveSessionState(
 
         const state: PersistedSessionState = {
             sessionName: sessionName,
-            manualMode: !!sessionState.manualMode,
             prune: {
                 tools: Object.fromEntries(sessionState.prune.tools),
                 messages: serializePruneMessagesState(sessionState.prune.messages),
@@ -209,54 +207,6 @@ export async function loadSessionState(
         })
         return null
     }
-}
-
-function emptyPersistedState(manualMode: boolean): PersistedSessionState {
-    return {
-        manualMode,
-        prune: {
-            tools: {},
-            messages: {
-                byMessageId: {},
-                blocksById: {},
-                activeBlockIds: [],
-                activeByAnchorMessageId: {},
-                nextBlockId: 1,
-                nextRunId: 1,
-            },
-        },
-        nudges: {
-            contextLimitAnchors: [],
-            turnNudgeAnchors: [],
-            iterationNudgeAnchors: [],
-        },
-        stats: {
-            pruneTokenCounter: 0,
-            totalPruneTokens: 0,
-            compressionUsage: emptyCompressionUsage(),
-        },
-        lastUpdated: new Date().toISOString(),
-    }
-}
-
-export async function loadManualModeSetting(
-    sessionId: string,
-    logger: Logger,
-): Promise<boolean | undefined> {
-    const state = await loadSessionState(sessionId, logger)
-    return typeof state?.manualMode === "boolean" ? state.manualMode : undefined
-}
-
-export async function saveManualModeSetting(
-    sessionId: string,
-    manualMode: boolean,
-    logger: Logger,
-): Promise<void> {
-    const existing = await loadSessionState(sessionId, logger)
-    const state = existing ?? emptyPersistedState(manualMode)
-    state.manualMode = manualMode
-    state.lastUpdated = new Date().toISOString()
-    await writePersistedSessionState(sessionId, state, logger)
 }
 
 export interface AggregatedStats {

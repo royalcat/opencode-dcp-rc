@@ -12,7 +12,6 @@ import { getSubAgentId, mergeSubagentResult } from "../lib/subagents/subagent-re
 
 const logger = new Logger(false)
 const config = {
-    manualMode: { automaticStrategies: true },
     turnProtection: { enabled: false, turns: 4 },
     protectedFilePatterns: ["**/protected.txt"],
     strategies: {

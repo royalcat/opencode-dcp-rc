@@ -13,17 +13,13 @@ function buildConfig(
 ): PluginConfig {
     return {
         enabled: true,
+        passiveMode: false,
         debug: false,
         pruneNotification: "off",
         pruneNotificationType: "chat",
         commands: {
             enabled: true,
             protectedTools: [],
-        },
-        manualMode: {
-            enabled: false,
-            automaticStrategies: true,
-            allowCompressTool: false,
         },
         turnProtection: {
             enabled: false,

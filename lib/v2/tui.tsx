@@ -49,7 +49,7 @@ export async function setup(ctx: Plugin.Context) {
                 show(() => (
                     <PanelDialog
                         api={api}
-                        manualMode={data.manualMode}
+                        passiveMode={data.passiveMode}
                         canCompress={data.canCompress}
                         blockedReason={data.blockedReason}
                         onContext={() => {
@@ -57,12 +57,6 @@ export async function setup(ctx: Plugin.Context) {
                         }}
                         onStats={() => {
                             void open("stats")
-                        }}
-                        onManual={(enabled) => {
-                            void client
-                                .manual({ sessionID, enabled }, options())
-                                .then(back)
-                                .catch(error)
                         }}
                     />
                 ))

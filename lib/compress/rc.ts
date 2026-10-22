@@ -1,7 +1,6 @@
 import { tool } from "@opencode-ai/plugin"
 import type { ToolContext, SelectionResolution } from "./types"
 import type { WithParts } from "../state"
-import { refreshManualMode } from "../state"
 import { formatBlockRef, formatMessageRef, parseBoundaryId, type IdFormat } from "../message-ids"
 import {
     buildSearchContext,
@@ -239,71 +238,66 @@ export function createRcCompressTool(ctx: ToolContext): ReturnType<typeof tool> 
                 typeof (toolCtx as any)?.callID === "string" ? (toolCtx as any).callID : undefined
             const toolMessageID = String((toolCtx as any)?.messageID ?? "")
 
-            try {
-                const { rawMessages } = await prepareSession(
-                    ctx,
-                    toolCtx as any,
-                    `Compress: ${input.ids.join(", ")}`,
-                )
+            const { rawMessages } = await prepareSession(
+                ctx,
+                toolCtx as any,
+                `Compress: ${input.ids.join(", ")}`,
+            )
 
-                const selectors = input.ids.map((selector) =>
-                    parseSelector(selector, ctx.state.idFormat),
-                )
-                const plans = planSelections(ctx, rawMessages, selectors)
-                validateNonOverlapping(plans)
-                for (const plan of plans) {
-                    assertBlockCoverage(ctx, plan.selector.selector, plan.selection)
-                }
-
-                const segments: SummarySegment[] = plans.map((plan) => ({
-                    selector: plan.selector.selector,
-                    messages: plan.messages,
-                    priorSummaries: plan.priorSummaries,
-                }))
-
-                const { text, usage } = await generateSummaries(ctx, sessionID, segments)
-                ctx.state.stats.compressionUsage = addCompressionUsageTotals(
-                    ctx.state.stats.compressionUsage,
-                    usage,
-                )
-                await saveSessionState(ctx.state, ctx.logger)
-                const accepted = await resolveAcceptedSections(
-                    ctx,
-                    plans.map((plan) => plan.selector.selector),
-                    text,
-                )
-                if (accepted.length === 0) {
-                    throw new Error("summary reply contained no usable sections")
-                }
-
-                const { entries, applied, missing } = await applySummaries(
-                    ctx,
-                    sessionID,
-                    toolMessageID,
-                    callId,
-                    plans,
-                    accepted,
-                )
-                if (entries.length === 0) {
-                    throw new Error("summary reply could not be applied to the session")
-                }
-
-                await finalizeSession(
-                    ctx,
-                    toolCtx as any,
-                    rawMessages,
-                    entries,
-                    plans.map((plan) => plan.selector.selector).join(", "),
-                )
-
-                if (missing.length === 0) {
-                    return `Compressed: ${applied.join(", ")}.`
-                }
-                return `Compressed: ${applied.join(", ")}. Not compressed: ${missing.join(", ")}.`
-            } catch (error) {
-                await resetManualMode(ctx, sessionID)
-                throw error
+            const selectors = input.ids.map((selector) =>
+                parseSelector(selector, ctx.state.idFormat),
+            )
+            const plans = planSelections(ctx, rawMessages, selectors)
+            validateNonOverlapping(plans)
+            for (const plan of plans) {
+                assertBlockCoverage(ctx, plan.selector.selector, plan.selection)
             }
+
+            const segments: SummarySegment[] = plans.map((plan) => ({
+                selector: plan.selector.selector,
+                messages: plan.messages,
+                priorSummaries: plan.priorSummaries,
+            }))
+
+            const { text, usage } = await generateSummaries(ctx, sessionID, segments)
+            ctx.state.stats.compressionUsage = addCompressionUsageTotals(
+                ctx.state.stats.compressionUsage,
+                usage,
+            )
+            await saveSessionState(ctx.state, ctx.logger)
+            const accepted = await resolveAcceptedSections(
+                ctx,
+                plans.map((plan) => plan.selector.selector),
+                text,
+            )
+            if (accepted.length === 0) {
+                throw new Error("summary reply contained no usable sections")
+            }
+
+            const { entries, applied, missing } = await applySummaries(
+                ctx,
+                sessionID,
+                toolMessageID,
+                callId,
+                plans,
+                accepted,
+            )
+            if (entries.length === 0) {
+                throw new Error("summary reply could not be applied to the session")
+            }
+
+            await finalizeSession(
+                ctx,
+                toolCtx as any,
+                rawMessages,
+                entries,
+                plans.map((plan) => plan.selector.selector).join(", "),
+            )
+
+            if (missing.length === 0) {
+                return `Compressed: ${applied.join(", ")}.`
+            }
+            return `Compressed: ${applied.join(", ")}. Not compressed: ${missing.join(", ")}.`
         },
     })
 }
@@ -482,13 +476,4 @@ async function applySummaries(
         .map((plan) => plan.selector.selector)
         .filter((selector) => !appliedSet.has(selector))
     return { entries, applied, missing }
-}
-
-async function resetManualMode(ctx: ToolContext, sessionID: string): Promise<void> {
-    if (ctx.state.manualMode !== "compress-pending") {
-        return
-    }
-    ctx.state.manualMode = false
-    await refreshManualMode(ctx.state, sessionID, ctx.logger, ctx.config.manualMode.enabled)
-    await saveSessionState(ctx.state, ctx.logger)
 }

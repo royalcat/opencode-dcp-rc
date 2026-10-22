@@ -2,7 +2,7 @@ import type { SessionState, ToolParameterEntry, WithParts } from "./types"
 import type { Logger } from "../logger"
 import { emptyCompressionUsage, normalizeCompressionUsageTotals } from "../compress/usage"
 import { applyPendingCompressionDurations } from "../compress/timing"
-import { loadManualModeSetting, loadSessionState, saveSessionState } from "./persistence"
+import { loadSessionState, saveSessionState } from "./persistence"
 import {
     isSubAgentSession,
     findLastCompactionTimestamp,
@@ -21,7 +21,6 @@ export const checkSession = async (
     state: SessionState,
     logger: Logger,
     messages: WithParts[],
-    manualModeDefault: boolean,
 ): Promise<void> => {
     const lastUserMessage = getLastUserMessage(messages)
     if (!lastUserMessage) {
@@ -33,14 +32,7 @@ export const checkSession = async (
     if (state.sessionId === null || state.sessionId !== lastSessionId) {
         logger.info(`Session changed: ${state.sessionId} -> ${lastSessionId}`)
         try {
-            await ensureSessionInitialized(
-                client,
-                state,
-                lastSessionId,
-                logger,
-                messages,
-                manualModeDefault,
-            )
+            await ensureSessionInitialized(client, state, lastSessionId, logger, messages)
         } catch (err: any) {
             logger.error("Failed to initialize session state", { error: err.message })
         }
@@ -62,7 +54,6 @@ export const checkSession = async (
     }
 
     state.currentTurn = countTurns(state, messages)
-    await refreshManualMode(state, lastSessionId, logger, manualModeDefault)
 }
 
 export function createSessionState(idFormat: IdFormat = "xml"): SessionState {
@@ -70,9 +61,7 @@ export function createSessionState(idFormat: IdFormat = "xml"): SessionState {
         idFormat,
         sessionId: null,
         isSubAgent: false,
-        manualMode: false,
         compressPermission: undefined,
-        pendingManualTrigger: null,
         prune: {
             tools: new Map<string, number>(),
             messages: createPruneMessagesState(),
@@ -109,9 +98,7 @@ export function createSessionState(idFormat: IdFormat = "xml"): SessionState {
 export function resetSessionState(state: SessionState): void {
     state.sessionId = null
     state.isSubAgent = false
-    state.manualMode = false
     state.compressPermission = undefined
-    state.pendingManualTrigger = null
     state.prune = {
         tools: new Map<string, number>(),
         messages: createPruneMessagesState(),
@@ -146,7 +133,6 @@ export async function ensureSessionInitialized(
     sessionId: string,
     logger: Logger,
     messages: WithParts[],
-    manualModeEnabled: boolean,
 ): Promise<void> {
     if (state.sessionId === sessionId) {
         return
@@ -156,7 +142,6 @@ export async function ensureSessionInitialized(
     // logger.info("Initializing session state", { sessionId: sessionId })
 
     resetSessionState(state)
-    state.manualMode = manualModeEnabled ? "active" : false
     state.sessionId = sessionId
 
     const isSubAgent = await isSubAgentSession(client, sessionId)
@@ -170,10 +155,6 @@ export async function ensureSessionInitialized(
     const persisted = await loadSessionState(sessionId, logger)
     if (persisted === null) {
         return
-    }
-
-    if (typeof persisted.manualMode === "boolean") {
-        state.manualMode = persisted.manualMode ? "active" : false
     }
 
     state.prune.tools = loadPruneMap(persisted.prune.tools)
@@ -196,19 +177,4 @@ export async function ensureSessionInitialized(
     if (applied > 0) {
         await saveSessionState(state, logger)
     }
-}
-
-export async function refreshManualMode(
-    state: SessionState,
-    sessionId: string,
-    logger: Logger,
-    manualModeDefault: boolean,
-): Promise<void> {
-    if (state.manualMode === "compress-pending") {
-        return
-    }
-
-    const persisted = await loadManualModeSetting(sessionId, logger)
-    const enabled = persisted ?? manualModeDefault
-    state.manualMode = enabled ? "active" : false
 }

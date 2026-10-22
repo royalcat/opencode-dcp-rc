@@ -1,6 +1,11 @@
 import type { SessionState, WithParts } from "../state"
 import type { PluginConfig } from "../config"
-import { formatBlockRef, parseBoundaryId } from "../message-ids"
+import {
+    formatBlockRef,
+    parseBoundaryId,
+    parseMessageRef,
+    type ParsedBoundaryId,
+} from "../message-ids"
 import { isIgnoredUserMessage, isProtectedUserMessage } from "../messages/query"
 import { filterMessages } from "../messages/shape"
 import { countAllMessageTokens } from "../token-utils"
@@ -44,6 +49,96 @@ export function buildSearchContext(state: SessionState, rawMessages: WithParts[]
     }
 }
 
+function describeUnavailableBoundary(
+    parsed: ParsedBoundaryId,
+    context: SearchContext,
+    state: SessionState,
+): string {
+    if (parsed.kind === "compressed-block") {
+        const block = state.prune.messages.blocksById.get(parsed.blockId)
+        return block && block.active
+            ? `${parsed.ref} could not be mapped to a current message`
+            : `${parsed.ref} is not an active compressed block`
+    }
+
+    const rawId = state.messageIds.byRef.get(parsed.ref)
+    if (!rawId) {
+        return `${parsed.ref} was never assigned in this session`
+    }
+
+    const message = context.rawMessagesById.get(rawId)
+    if (!message) {
+        return `${parsed.ref} refers to a message that is no longer in the current context`
+    }
+    if (message.info.role === "user") {
+        return `${parsed.ref} refers to a user message, and user messages are not selectable`
+    }
+
+    return `${parsed.ref} is not selectable in the current context`
+}
+
+function formatNearestBoundaryRefs(
+    lookup: Map<string, BoundaryReference>,
+    parsed: ParsedBoundaryId,
+    state: SessionState,
+): string {
+    const parts: string[] = []
+
+    if (parsed.kind === "message") {
+        let before: { ref: string; index: number } | undefined
+        let after: { ref: string; index: number } | undefined
+        for (const [ref, boundary] of lookup) {
+            if (boundary.kind !== "message") {
+                continue
+            }
+            const index = parseMessageRef(ref, state.idFormat)
+            if (index === null) {
+                continue
+            }
+            if (index < parsed.index && (!before || index > before.index)) {
+                before = { ref, index }
+            }
+            if (index > parsed.index && (!after || index < after.index)) {
+                after = { ref, index }
+            }
+        }
+
+        const nearest = [
+            ...(before ? [`${before.ref} (before)`] : []),
+            ...(after ? [`${after.ref} (after)`] : []),
+        ]
+        if (nearest.length > 0) {
+            parts.push(`nearest selectable message refs: ${nearest.join(", ")}`)
+        } else {
+            parts.push("no selectable message refs are available")
+        }
+    }
+
+    const blocks = Array.from(lookup.entries())
+        .filter(([, boundary]) => boundary.kind === "compressed-block")
+        .map(([ref]) => ref)
+    if (blocks.length > 0) {
+        const shown = blocks.slice(0, 8).join(", ")
+        const extra = blocks.length > 8 ? ` (+${blocks.length - 8} more)` : ""
+        parts.push(`active blocks: ${shown}${extra}`)
+    }
+
+    return parts.join("; ")
+}
+
+function unavailableBoundaryIssue(
+    label: "startId" | "endId",
+    parsed: ParsedBoundaryId,
+    lookup: Map<string, BoundaryReference>,
+    context: SearchContext,
+    state: SessionState,
+): string {
+    const reason = describeUnavailableBoundary(parsed, context, state)
+    const available = formatNearestBoundaryRefs(lookup, parsed, state)
+    const suffix = available.length > 0 ? ` ${available}.` : ""
+    return `${label} ${parsed.ref} is not available in the current conversation context: ${reason}.${suffix} Choose an injected ID visible in context.`
+}
+
 export function resolveBoundaryIds(
     context: SearchContext,
     state: SessionState,
@@ -84,15 +179,11 @@ export function resolveBoundaryIds(
     const endReference = lookup.get(parsedEndId.ref)
 
     if (!startReference) {
-        issues.push(
-            `startId ${parsedStartId.ref} is not available in the current conversation context. Choose an injected ID visible in context.`,
-        )
+        issues.push(unavailableBoundaryIssue("startId", parsedStartId, lookup, context, state))
     }
 
     if (!endReference) {
-        issues.push(
-            `endId ${parsedEndId.ref} is not available in the current conversation context. Choose an injected ID visible in context.`,
-        )
+        issues.push(unavailableBoundaryIssue("endId", parsedEndId, lookup, context, state))
     }
 
     if (issues.length > 0) {

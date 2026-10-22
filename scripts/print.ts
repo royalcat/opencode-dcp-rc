@@ -38,10 +38,8 @@ Options:
   --list                   List available prompt keys
   --show <key>             Print effective prompt text for key
   --system                 Print effective system prompt with no extensions
-  --system-manual          Print system prompt with the trigger-required manual extension
-  --system-manual-free     Print system prompt with the free manual extension
   --system-subagent        Print system prompt with subagent extension
-  --system-all             Print system prompt with both manual and subagent extensions
+  --system-all             Print system prompt with the subagent extension
 
 Prompt keys:
   system, compress-rc,
@@ -87,22 +85,12 @@ if (showIndex >= 0) {
 }
 
 if (args.includes("--system-all")) {
-    console.log(renderSystemPrompt(runtimePrompts, undefined, "trigger-required", true))
-    process.exit(0)
-}
-
-if (args.includes("--system-manual")) {
-    console.log(renderSystemPrompt(runtimePrompts, undefined, "trigger-required"))
-    process.exit(0)
-}
-
-if (args.includes("--system-manual-free")) {
-    console.log(renderSystemPrompt(runtimePrompts, undefined, "free"))
+    console.log(renderSystemPrompt(runtimePrompts, undefined, true))
     process.exit(0)
 }
 
 if (args.includes("--system-subagent")) {
-    console.log(renderSystemPrompt(runtimePrompts, undefined, "off", true))
+    console.log(renderSystemPrompt(runtimePrompts, undefined, true))
     process.exit(0)
 }
 

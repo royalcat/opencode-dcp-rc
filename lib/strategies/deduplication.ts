@@ -15,10 +15,6 @@ export const deduplicate = (
     config: PluginConfig,
     messages: WithParts[],
 ): void => {
-    if (state.manualMode && !config.manualMode.automaticStrategies) {
-        return
-    }
-
     if (!config.strategies.deduplication.enabled) {
         return
     }

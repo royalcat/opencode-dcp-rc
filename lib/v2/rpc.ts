@@ -47,14 +47,13 @@ export const rpc = {
         snapshot: {
             input: session,
             output: z.object({
-                manualMode: z.boolean(),
+                passiveMode: z.boolean(),
                 canCompress: z.boolean(),
                 blockedReason: z.string().optional(),
                 context,
                 stats,
             }),
         },
-        manual: { input: session.extend({ enabled: z.boolean() }), output: z.object({}) },
     },
     events: {},
 } as const

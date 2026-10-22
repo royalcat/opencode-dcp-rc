@@ -29,16 +29,17 @@ const {
     hasSummaryMarker,
     RC_SUMMARY_MARKER,
 } = await import("../lib/compress/summary")
+const { buildSearchContext, resolveBoundaryIds } = await import("../lib/compress/search")
 const logger = new Logger(false)
 
 function buildConfig(overrides: Partial<PluginConfig["compress"]> = {}): PluginConfig {
     return {
         enabled: true,
+        passiveMode: false,
         debug: false,
         pruneNotification: "off",
         pruneNotificationType: "chat",
         commands: { enabled: true, protectedTools: [] },
-        manualMode: { enabled: false, automaticStrategies: true, allowCompressTool: false },
         turnProtection: { enabled: false, turns: 4 },
         experimental: { allowSubAgents: false, customPrompts: false },
         protectedFilePatterns: [],
@@ -360,13 +361,60 @@ test("rc compression generates and applies summaries mid-turn", async () => {
 
 test("rc compression fails mid-turn without mutating state", async () => {
     const { state, tool, run } = createHarness({ generateError: new Error("boom") })
-    state.manualMode = "compress-pending"
 
     await assert.rejects(tool.execute({ ids: ["m0001-m0002"] }, run as any), /boom/)
 
     assert.equal(state.prune.messages.blocksById.size, 0)
     assert.equal(state.prune.messages.activeBlockIds.size, 0)
-    assert.notEqual(state.manualMode, "compress-pending")
+})
+
+test("rc allows consecutive compress calls in one session", async () => {
+    const { state, tool, run, generateCalls } = createHarness()
+
+    const first = await tool.execute({ ids: ["m0001-m0002"] }, run as any)
+    const second = await tool.execute({ ids: ["m0003-m0004"] }, run as any)
+
+    assert.equal(first, "Compressed: m0001-m0002.")
+    assert.equal(second, "Compressed: m0003-m0004.")
+    assert.equal(generateCalls.length, 2)
+    assert.equal(state.prune.messages.activeBlockIds.size, 2)
+})
+
+test("rc boundary errors explain the reason and show nearest refs", async () => {
+    const { tool, run } = createHarness()
+
+    await assert.rejects(tool.execute({ ids: ["m0001-m0009"] }, run as any), (error: Error) => {
+        assert.match(error.message, /endId m0009 is not available/)
+        assert.match(error.message, /never assigned in this session/)
+        assert.match(error.message, /nearest selectable message refs: m0004 \(before\)/)
+        return true
+    })
+})
+
+test("rc boundary errors explain unselectable user messages", async () => {
+    const config = buildConfig()
+    config.compress.protectUserMessages = true
+    const { tool, run } = createHarness({ config })
+
+    await assert.rejects(tool.execute({ ids: ["m0001"] }, run as any), (error: Error) => {
+        assert.match(error.message, /user message, and user messages are not selectable/)
+        return true
+    })
+})
+
+test("rc boundary errors explain messages removed from the context", () => {
+    const state = createSessionState("xml")
+    const raw = buildRaw("ses_removed")
+    state.messageIds.byRef.set("m0010", "msg_gone")
+    const context = buildSearchContext(state, raw)
+
+    assert.throws(
+        () => resolveBoundaryIds(context, state, buildConfig(), "m0010", "m0010"),
+        (error: Error) => {
+            assert.match(error.message, /no longer in the current context/)
+            return true
+        },
+    )
 })
 
 test("rc applies partial summaries and reports the missing selectors", async () => {
@@ -492,16 +540,14 @@ test("rc rejects overlapping selectors in one call", async () => {
     )
 })
 
-test("rc resets pending manual mode and emits notifications after applying", async () => {
+test("rc emits notifications after applying", async () => {
     const config = buildConfig()
     config.pruneNotification = "detailed"
     config.pruneNotificationType = "toast"
-    const { state, tool, run, toasts } = createHarness({ config })
-    state.manualMode = "compress-pending"
+    const { tool, run, toasts } = createHarness({ config })
 
     await tool.execute({ ids: ["m0001-m0002"] }, run as any)
 
-    assert.notEqual(state.manualMode, "compress-pending")
     assert.equal(toasts.length, 1)
     assert.equal(toasts[0]?.body?.title, "DCP: Compress Notification")
 })

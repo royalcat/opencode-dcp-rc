@@ -5,7 +5,7 @@ Working notes for agents and developers in this repository.
 ## Project
 
 - `@royalcat/opencode-dcp-rc` is a fork of [DCP](https://github.com/Tarquinen/opencode-dynamic-context-pruning)
-  (upstream v3.2.0, commit `f8232fde`), maintained by RoyalCat. Current version: **4.1.0**.
+  (upstream v3.2.0, commit `f8232fde`), maintained by RoyalCat. Current version: **4.2.0**.
 - `rc` = **RoyalCat** (fork owner initials). It is _not_ "release candidate": do not
   name versions `x.y.z-rc.N`.
 - Purpose: Make a fully local OpenCode **V2** plugin, with the plugin's internals invisible to the user.
@@ -37,7 +37,9 @@ check, typecheck, build, test, `npm audit`.
 | Plugin entry (V2 `{ id, setup }`)       | `index.ts`                                                                                |
 | V2 plugin wiring (hooks, tool, rc)      | `lib/v2/index.ts`                                                                         |
 | rc compress tool (selection-only)       | `lib/compress/rc.ts`                                                                      |
+| Selection resolution / boundary errors  | `lib/compress/search.ts`                                                                  |
 | rc summary prompt build/parse/serialize | `lib/compress/summary.ts`                                                                 |
+| `/dcp-compress` snippet                 | `lib/commands/manual.ts` (prompt only; no trigger state)                                  |
 | Hidden summary usage capture (V2)       | `lib/v2/usage.ts` (aisdk + http hooks, local estimates)                                   |
 | Output scrubbing (V2 response side)     | `lib/v2/scrub.ts`                                                                         |
 | Compression usage totals                | `lib/compress/usage.ts` (normalization, aggregation)                                      |
@@ -49,7 +51,7 @@ check, typecheck, build, test, `npm audit`.
 | Message ID formats                      | `lib/message-ids.ts`                                                                      |
 | State persistence                       | `lib/state/`                                                                              |
 | Protected content append helpers        | `lib/compress/protected-content.ts`                                                       |
-| rc unit tests                           | `tests/rc.test.ts`                                                                        |
+| rc unit tests                           | `tests/rc.test.ts`, `tests/modes.test.ts`                                                 |
 | E2E lab (mock LLM)                      | `tests/lab/` (`mock.mjs`, `rc-run.mjs`), runner `scripts/lab-rc.mjs`                      |
 | Fork branding                           | `tui.tsx`, `lib/v2/rpc.ts`                                                                |
 
@@ -60,14 +62,18 @@ check, typecheck, build, test, `npm audit`.
 2. The model calls `compress` with `{"ids":["m0004-m0008","m0011"]}` and nothing else —
    it does not write summaries. Selectors may be message IDs, block IDs (`bN`), or
    inclusive ranges of either, in either ID format (`mNNNN`/`bN` XML or `@N@`/`@bN@`
-   compact); they are normalized internally.
+   compact); they are normalized internally. Refs are monotonic per session and never
+   reused, so reverted/deleted messages and BLOCKED user messages leave holes in the
+   visible numbering; the model must not guess across a hole.
 3. `lib/compress/rc.ts` resolves the selectors, validates non-overlap and block
    coverage, then performs a hidden **synchronous** `ctx.session.generate()` carrying
    the marker `[[DCP-RC-SUMMARY:<callId>]]` at the end of the prompt (detection scans
    the whole text; the stable prefix lets retried or repeated requests reuse provider
    prefix caching). The call id attributes provider telemetry back to the request.
    There is no deferred/idle path: if generation fails, the tool call fails and the
-   selection stays untouched.
+   selection stays untouched. Invalid boundaries fail before any request and return
+   an actionable error: the reason (never assigned / removed from context / user
+   message) plus the nearest selectable message refs and active block refs.
 4. `session.hook("generate")` in `lib/v2/index.ts` detects the marker and strips the
    session message context from that transient request. The host system prompt remains
    attached (byte-identical prefix of the main request, so providers with prefix caching
@@ -88,14 +94,20 @@ check, typecheck, build, test, `npm audit`.
    anchor).
 7. `protectUserMessages` marks user messages as `BLOCKED`: they get no visible ref,
    cannot be boundaries, and are excluded from coverage and from the hidden prompt.
-8. Manual mode (per-session state, default from `manualMode.enabled`) turns off all
-   nudges and, with `manualMode.automaticStrategies = false`, the dedup/purge
-   strategies. `manualMode.allowCompressTool` decides whether the model may still
-   call `compress` on request (`"free"`) or only after a `/dcp-compress` trigger
-   (`"trigger-required"`); `manualCompressionMode()` in `lib/compress-permission.ts`
-   is the single gate, and it also selects the system-prompt extension. A project
-   can set the three keys in its `.opencode/dcp-rc.jsonc` to stay passive while
-   keeping manual compression; `/dcp manual` still overrides per session.
+8. Modes: `enabled: false` is Off (no tool, nudges, or strategies);
+   `enabled: true` is Free (tool always available, nudges on). `passiveMode: true`
+   keeps the tool but suppresses every nudge; dedup/purge still follow
+   `strategies.*.enabled`, and the base system prompt keeps its compression
+   guidance. `/dcp-compress` is only a prompt snippet asking the model to compress —
+   it carries no trigger state and imposes no per-turn call limit. The compress tool
+   is never gated by mode. 4.2.0 removed the old manual-mode state machine:
+   `manualMode.*` config, `compress-pending`, `/dcp manual`, and the `manual` RPC
+   method no longer exist (old configs get an unknown-key toast; use
+   `passiveMode: true` for the previous "compression without nudges" behavior).
+   The RPC snapshot now exposes `passiveMode` instead of `manualMode`. The removed
+   gate also fixed a dead end: a cheap validation failure used to consume the manual
+   trigger, so the model's corrected retry was rejected with "compress blocked" and
+   cost a full-context round trip.
 9. Invisibility invariants (design goal, not configurable): transforms apply to the
    outgoing copy only; injected metadata (ID tags, nudges, summary prompt, markers)
    never enters stored history or user-visible output. The `compress` tool call and
@@ -135,7 +147,7 @@ check, typecheck, build, test, `npm audit`.
 
 13. Prompt text lives in `lib/prompts/`: `system.ts` (system prompt, injected on every
     request), `compress-rc.ts` (the rc `compress` tool description), the `*-nudge.ts`
-    files, and `extensions/` (manual/subagent system addenda). `lib/prompts/store.ts`
+    files, and `extensions/` (subagent system addendum). `lib/prompts/store.ts`
     selects bundled vs override text and exposes `RuntimePrompts`; `rc.ts` registers
     `runtimePrompts.compressRc` as the tool description.
 14. `system.ts` and `compress-rc.ts` both carry the intentional compress-timing
@@ -174,6 +186,9 @@ was fixed; the rest is deliberately deferred.
 
 - Config files are `dcp-rc.jsonc` / `dcp-rc.json` (global, `$OPENCODE_CONFIG_DIR`,
   project `.opencode/`). There is no `compress.mode` or `autoUpdate` key.
+- Since 4.2.0 the only mode keys are top-level `enabled` (Off/Free) and
+  `passiveMode` (suppress nudges, keep the tool). Do not reintroduce `manualMode`
+  or per-session trigger state.
 - Fork branding is limited to the package name `@royalcat/opencode-dcp-rc`, the RPC id
   `dcp-rc` (`lib/v2/rpc.ts`), the plugin ids (`index.ts`, `tui.tsx`), and the
   config file names. Slash commands (`/dcp`, `/dcp-compress`) and prompt overrides
@@ -211,6 +226,13 @@ was fixed; the rest is deliberately deferred.
   aisdk parts, and the HTTP hook kill switch. The lab mock's default reply echoes a
   `dcp-system-reminder` block and a standalone message-ID line; `rc-run.mjs` asserts
   neither reaches CLI output or the second run's stored context.
+- `tests/modes.test.ts` (replaces `manual-free-mode.test.ts` and
+  `finalize-session.test.ts`) covers the mode matrix: Free fires nudges (positive
+  control), Passive suppresses them and clears anchors, Passive still runs
+  deduplication/purge, no manual prompt extensions remain, and `prepareSession`
+  works with no trigger state. `tests/rc.test.ts` also covers consecutive compress
+  calls and the boundary-error guidance (never assigned / removed / user message,
+  nearest refs).
 - Environment gotcha: some agent tool-output displays strip `@N@` tokens. Verify IDs
   and values with `grep`/`xxd` instead of trusting rendered output.
 - Known limitation kept in the fork: the V2 public plugin API does not support

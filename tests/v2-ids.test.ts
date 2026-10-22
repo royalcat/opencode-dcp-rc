@@ -27,7 +27,6 @@ const logger = new Logger(false)
 function config(): PluginConfig {
     return {
         compress: { permission: "allow", protectedTools: [], protectUserMessages: false },
-        manualMode: { enabled: false, automaticStrategies: true, allowCompressTool: false },
         experimental: { allowSubAgents: false },
         turnProtection: { enabled: false, turns: 4 },
         strategies: { deduplication: { enabled: false }, purgeErrors: { enabled: false } },

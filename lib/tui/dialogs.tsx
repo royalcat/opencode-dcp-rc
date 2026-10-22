@@ -175,12 +175,11 @@ export function StatsDialog(props: { api: ViewApi; report: StatsReport; onBack: 
 
 export function PanelDialog(props: {
     api: ViewApi
-    manualMode: boolean
+    passiveMode: boolean
     canCompress: boolean
     blockedReason?: string
     onContext: () => void
     onStats: () => void
-    onManual: (enabled: boolean) => void
 }) {
     const theme = props.api.theme.current
     const canCompress = props.canCompress
@@ -217,10 +216,11 @@ export function PanelDialog(props: {
                 )}
             </Card>
             <Card theme={theme} title="Session State">
-                <ManualModeToggle
-                    api={props.api}
-                    enabled={props.manualMode}
-                    onToggle={props.onManual}
+                <StatusPill
+                    theme={theme}
+                    label="Nudges"
+                    value={props.passiveMode ? "passive (off)" : "enabled"}
+                    accent={props.passiveMode ? "warning" : "success"}
                 />
                 <StatusPill
                     theme={theme}
@@ -230,32 +230,5 @@ export function PanelDialog(props: {
                 />
             </Card>
         </DcpFrame>
-    )
-}
-
-function ManualModeToggle(props: {
-    api: ViewApi
-    enabled: boolean
-    onToggle: (enabled: boolean) => void
-}) {
-    const theme = props.api.theme.current
-    const enabled = props.enabled
-    const track = enabled ? theme.success : theme.error
-    return (
-        <box flexDirection="row" justifyContent="space-between" paddingLeft={1} paddingRight={1}>
-            <box width={22}>
-                <text fg={theme.primary}>
-                    <b>Manual mode</b>
-                </text>
-            </box>
-            <box
-                backgroundColor={track}
-                paddingLeft={1}
-                paddingRight={1}
-                onMouseUp={() => props.onToggle(!enabled)}
-            >
-                <text fg={theme.background}>{enabled ? "   ■" : "■   "}</text>
-            </box>
-        </box>
     )
 }
