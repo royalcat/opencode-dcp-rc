@@ -54,7 +54,9 @@ check, typecheck, build, test, `npm audit`.
 | `/dcp passive` handler                  | `lib/commands/passive.ts` (+ dispatch in `lib/hooks.ts`)                                  |
 | Protected content append helpers        | `lib/compress/protected-content.ts`                                                       |
 | rc unit tests                           | `tests/rc.test.ts`, `tests/modes.test.ts`                                                 |
-| Passive override tests                  | `tests/passive-command.test.ts`, `tests/passive-command-session.test.ts`, `tests/passive-persistence.test.ts`, `tests/modes.test.ts` |
+| Passive command tests                   | `tests/passive-command.test.ts`, `tests/modes.test.ts`                                    |
+| Passive session/cache tests             | `tests/passive-command-session.test.ts`                                                   |
+| Passive persistence tests               | `tests/passive-persistence.test.ts`                                                       |
 | E2E lab (mock LLM)                      | `tests/lab/` (`mock.mjs`, `rc-run.mjs`), runner `scripts/lab-rc.mjs`                      |
 | Fork branding                           | `tui.tsx`, `lib/v2/rpc.ts`                                                                |
 
