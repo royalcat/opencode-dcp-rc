@@ -54,7 +54,7 @@ check, typecheck, build, test, `npm audit`.
 | `/dcp passive` handler                  | `lib/commands/passive.ts` (+ dispatch in `lib/hooks.ts`)                                  |
 | Protected content append helpers        | `lib/compress/protected-content.ts`                                                       |
 | rc unit tests                           | `tests/rc.test.ts`, `tests/modes.test.ts`                                                 |
-| Passive override tests                  | `tests/passive-command.test.ts`, `tests/modes.test.ts`                                    |
+| Passive override tests                  | `tests/passive-command.test.ts`, `tests/passive-command-session.test.ts`, `tests/passive-persistence.test.ts`, `tests/modes.test.ts` |
 | E2E lab (mock LLM)                      | `tests/lab/` (`mock.mjs`, `rc-run.mjs`), runner `scripts/lab-rc.mjs`                      |
 | Fork branding                           | `tui.tsx`, `lib/v2/rpc.ts`                                                                |
 
@@ -247,6 +247,10 @@ was fixed; the rest is deliberately deferred.
   works with no trigger state. `tests/rc.test.ts` also covers consecutive compress
   calls and the boundary-error guidance (never assigned / removed / user message,
   nearest refs).
+- `tests/passive-command.test.ts` covers `/dcp passive` parsing and state changes;
+  `tests/passive-command-session.test.ts` asserts the command never prompts the
+  session or edits messages; `tests/passive-persistence.test.ts` covers the
+  persisted override round-trip.
 - Environment gotcha: some agent tool-output displays strip `@N@` tokens. Verify IDs
   and values with `grep`/`xxd` instead of trusting rendered output.
 - Known limitation kept in the fork: the V2 public plugin API does not support
