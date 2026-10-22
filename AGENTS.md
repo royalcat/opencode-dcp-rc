@@ -5,7 +5,7 @@ Working notes for agents and developers in this repository.
 ## Project
 
 - `@royalcat/opencode-dcp-rc` is a fork of [DCP](https://github.com/Tarquinen/opencode-dynamic-context-pruning)
-  (upstream v3.2.0, commit `f8232fde`), maintained by RoyalCat. Current version: **4.2.0**.
+  (upstream v3.2.0, commit `f8232fde`), maintained by RoyalCat. Current version: **4.3.0**.
 - `rc` = **RoyalCat** (fork owner initials). It is _not_ "release candidate": do not
   name versions `x.y.z-rc.N`.
 - Purpose: Make a fully local OpenCode **V2** plugin, with the plugin's internals invisible to the user.
@@ -50,8 +50,11 @@ check, typecheck, build, test, `npm audit`.
 | Config loading/defaults                 | `lib/config.ts`, schema `dcp.schema.json`                                                 |
 | Message ID formats                      | `lib/message-ids.ts`                                                                      |
 | State persistence                       | `lib/state/`                                                                              |
+| Passive-mode override                   | `lib/passive-mode.ts` (state field in `lib/state/`, RPC `setPassive`)                     |
+| `/dcp passive` handler                  | `lib/commands/passive.ts` (+ dispatch in `lib/hooks.ts`)                                  |
 | Protected content append helpers        | `lib/compress/protected-content.ts`                                                       |
 | rc unit tests                           | `tests/rc.test.ts`, `tests/modes.test.ts`                                                 |
+| Passive override tests                  | `tests/passive-command.test.ts`, `tests/modes.test.ts`                                    |
 | E2E lab (mock LLM)                      | `tests/lab/` (`mock.mjs`, `rc-run.mjs`), runner `scripts/lab-rc.mjs`                      |
 | Fork branding                           | `tui.tsx`, `lib/v2/rpc.ts`                                                                |
 
@@ -107,7 +110,11 @@ check, typecheck, build, test, `npm audit`.
    The RPC snapshot now exposes `passiveMode` instead of `manualMode`. The removed
    gate also fixed a dead end: a cheap validation failure used to consume the manual
    trigger, so the model's corrected retry was rejected with "compress blocked" and
-   cost a full-context round trip.
+   cost a full-context round trip. Passive mode can also be overridden per session at
+   runtime (`/dcp passive on|off|reset`, DCP panel row, RPC `setPassive`). The
+   override lives in the session's DCP state, never edits stored messages, and only
+   changes nudge injection on the next context hook; `reset` returns to config and
+   new sessions start from config.
 9. Invisibility invariants (design goal, not configurable): transforms apply to the
    outgoing copy only; injected metadata (ID tags, nudges, summary prompt, markers)
    never enters stored history or user-visible output. The `compress` tool call and
@@ -186,9 +193,16 @@ was fixed; the rest is deliberately deferred.
 
 - Config files are `dcp-rc.jsonc` / `dcp-rc.json` (global, `$OPENCODE_CONFIG_DIR`,
   project `.opencode/`). There is no `compress.mode` or `autoUpdate` key.
-- Since 4.2.0 the only mode keys are top-level `enabled` (Off/Free) and
+- Since 4.2.0 the only mode config keys are top-level `enabled` (Off/Free) and
   `passiveMode` (suppress nudges, keep the tool). Do not reintroduce `manualMode`
-  or per-session trigger state.
+  or the old per-turn manual trigger state; the intentional session-scoped passive
+  override lives in `lib/passive-mode.ts` and never edits session messages.
+- The override is also exposed over OpenCode's RPC as
+  `POST /api/rpc/dcp-rc/setPassive` with `{ sessionID, mode: "on" | "off" | "reset" }`
+  and Basic auth `opencode:$OPENCODE_SERVER_PASSWORD`. The OpenChamber extension
+  cannot call it yet: its guest `host.request` is origin-restricted and its local
+  service does not receive the OpenCode URL/password. Wiring that panel needs either
+  an OpenChamber host API or a file-based bridge.
 - Fork branding is limited to the package name `@royalcat/opencode-dcp-rc`, the RPC id
   `dcp-rc` (`lib/v2/rpc.ts`), the plugin ids (`index.ts`, `tui.tsx`), and the
   config file names. Slash commands (`/dcp`, `/dcp-compress`) and prompt overrides

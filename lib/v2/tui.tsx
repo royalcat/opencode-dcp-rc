@@ -22,6 +22,52 @@ export async function setup(ctx: Plugin.Context) {
         ctx.ui.dialog.set({ size: "xlarge" })
         ctx.ui.dialog.show(render)
     }
+    function passiveMessage(passive: boolean, source: "config" | "session"): string {
+        const mode = passive ? "passive (nudges off)" : "enabled (nudges on)"
+        const origin = source === "session" ? "session override" : "config default"
+        return `${mode}\n\nSource: ${origin}`
+    }
+    function parsePassiveInput(
+        input: string,
+    ): "status" | "on" | "off" | "reset" | "invalid" | null {
+        const [command, action] = input.trim().toLowerCase().split(/\s+/)
+        if (command !== "passive") return null
+        if (!action || action === "status") return "status"
+        if (action === "on" || action === "off" || action === "reset") return action
+        return "invalid"
+    }
+    async function runPassive(
+        sessionID: string,
+        action: "status" | "on" | "off" | "reset" | "invalid",
+    ) {
+        if (action === "invalid") {
+            show(() => (
+                <StatusDialog
+                    api={api}
+                    title="Passive mode"
+                    eyebrow="DCP"
+                    message="Usage: /dcp passive [on|off|reset]"
+                />
+            ))
+            return
+        }
+        const result =
+            action === "status"
+                ? await client.snapshot({ sessionID }, options())
+                : await client.setPassive({ sessionID, mode: action }, options())
+        show(() => (
+            <StatusDialog
+                api={api}
+                title="Passive mode"
+                eyebrow="DCP"
+                message={passiveMessage(result.passiveMode, result.passiveModeSource)}
+            />
+        ))
+    }
+    async function togglePassive(sessionID: string, passiveMode: boolean) {
+        await client.setPassive({ sessionID, mode: passiveMode ? "off" : "on" }, options())
+        await open()
+    }
     async function open(page: "panel" | "context" | "stats" = "panel") {
         const route = ctx.ui.router.current()
         if (route.type !== "session") {
@@ -50,6 +96,7 @@ export async function setup(ctx: Plugin.Context) {
                     <PanelDialog
                         api={api}
                         passiveMode={data.passiveMode}
+                        passiveModeSource={data.passiveModeSource}
                         canCompress={data.canCompress}
                         blockedReason={data.blockedReason}
                         onContext={() => {
@@ -57,6 +104,9 @@ export async function setup(ctx: Plugin.Context) {
                         }}
                         onStats={() => {
                             void open("stats")
+                        }}
+                        onTogglePassive={() => {
+                            void togglePassive(sessionID, data.passiveMode).catch(error)
                         }}
                     />
                 ))
@@ -91,6 +141,11 @@ export async function setup(ctx: Plugin.Context) {
                             const route = ctx.ui.router.current()
                             if (route.type !== "session") return open()
                             try {
+                                const passive = parsePassiveInput(input)
+                                if (passive) {
+                                    await runPassive(route.sessionID, passive)
+                                    return
+                                }
                                 await ctx.client.session.command({
                                     sessionID: route.sessionID,
                                     name: "dcp",

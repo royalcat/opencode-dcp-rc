@@ -7,6 +7,7 @@ import type { Logger } from "../logger"
 import type { PluginConfig } from "../config"
 import type { SessionState, WithParts } from "../state"
 import { compressPermission } from "../compress-permission"
+import { effectivePassiveMode, passiveModeSource } from "../passive-mode"
 import { sendIgnoredMessage } from "../ui/notification"
 import { getCurrentParams } from "../token-utils"
 
@@ -27,6 +28,7 @@ const TUI_COMMANDS: [string, string][] = [
 
 const TOOL_COMMANDS: Record<string, [string, string]> = {
     compress: ["/dcp-compress [focus]", "Ask the model to compress the context now"],
+    passive: ["/dcp passive [on|off|reset]", "Override passive mode for this session"],
     decompress: ["/dcp decompress <n>", "Restore selected compression"],
     recompress: ["/dcp recompress <n>", "Re-apply a user-decompressed compression"],
 }
@@ -36,6 +38,7 @@ function getVisibleCommands(state: SessionState, config: PluginConfig): [string,
 
     if (compressPermission(state, config) !== "deny") {
         commands.push(TOOL_COMMANDS.compress)
+        commands.push(TOOL_COMMANDS.passive)
     }
 
     return commands
@@ -51,6 +54,9 @@ export function formatHelpMessage(state: SessionState, config: PluginConfig): st
     lines.push("╰─────────────────────────────────────────────────────────────────────────╯")
     lines.push("")
     lines.push(`  ${"Compression:".padEnd(colWidth)}${state.compressPermission ?? "allow"}`)
+    lines.push(
+        `  ${"Nudges:".padEnd(colWidth)}${effectivePassiveMode(state, config) ? "passive" : "enabled"} (${passiveModeSource(state)})`,
+    )
     lines.push("")
     lines.push("  Open the command palette for DCP modal commands.")
     lines.push("  Use /dcp-compress [focus] when you want DCP to ask the model to run compression.")

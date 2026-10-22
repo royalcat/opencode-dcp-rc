@@ -95,6 +95,8 @@ export interface SessionState {
     sessionId: string | null
     isSubAgent: boolean
     compressPermission: "ask" | "allow" | "deny" | undefined
+    /** Session-scoped passive-mode override; undefined follows config. */
+    passiveModeOverride?: boolean
     prune: Prune
     nudges: Nudges
     stats: SessionStats

@@ -9,6 +9,7 @@ import {
     handleDecompressCommand,
     handleHelpCommand,
     handleCompressCommand,
+    handlePassiveCommand,
     handleRecompressCommand,
     handleStatsCommand,
     handleSweepCommand,
@@ -129,6 +130,18 @@ export function createCommandExecuteHandler(
 
             if (subcommand === "stats") {
                 await handleStatsCommand(commandCtx)
+                return
+            }
+
+            if (subcommand === "passive") {
+                await handlePassiveCommand(
+                    {
+                        state,
+                        config,
+                        logger,
+                    },
+                    subArgs,
+                )
                 return
             }
 

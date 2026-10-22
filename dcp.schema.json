@@ -19,7 +19,7 @@
         "passiveMode": {
             "type": "boolean",
             "default": false,
-            "description": "Suppress every periodic compression nudge while keeping the compress tool available. Deduplication/purge strategies and the base system prompt are unchanged."
+            "description": "Default for all sessions: suppress every periodic compression nudge while keeping the compress tool available. A running session can override it with /dcp passive on|off|reset or the DCP panel. Deduplication/purge strategies and the base system prompt are unchanged."
         },
         "debug": {
             "type": "boolean",

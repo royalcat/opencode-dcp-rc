@@ -6,6 +6,7 @@ import { injectCompressNudges } from "../lib/messages/inject/inject"
 import { renderSystemPrompt } from "../lib/prompts"
 import type { RuntimePrompts } from "../lib/prompts/store"
 import { createSessionState, type WithParts } from "../lib/state"
+import { effectivePassiveMode, passiveModeSource, setPassiveMode } from "../lib/passive-mode"
 import { deduplicate } from "../lib/strategies/deduplication"
 import { purgeErrors } from "../lib/strategies/purge-errors"
 
@@ -109,6 +110,49 @@ test("passive mode clears previously anchored nudges", () => {
 
     assert.equal(state.nudges.contextLimitAnchors.size, 0)
     assert.equal(state.nudges.turnNudgeAnchors.size, 0)
+})
+
+test("session passive override wins over a free config", () => {
+    const state = createSessionState()
+    state.passiveModeOverride = true
+    const messages = buildMessages()
+
+    injectCompressNudges(state, buildConfig(), logger, messages, nudgePrompts)
+
+    assert.doesNotMatch(JSON.stringify(messages), /NUDGE/)
+    assert.equal(effectivePassiveMode(state, buildConfig()), true)
+    assert.equal(passiveModeSource(state), "session")
+})
+
+test("session passive override off wins over a passive config", () => {
+    const state = createSessionState()
+    state.passiveModeOverride = false
+    const messages = buildMessages()
+
+    injectCompressNudges(state, buildConfig({ passiveMode: true }), logger, messages, nudgePrompts)
+
+    assert.match(JSON.stringify(messages), /NUDGE/)
+    assert.equal(effectivePassiveMode(state, buildConfig({ passiveMode: true })), false)
+    assert.equal(passiveModeSource(state), "session")
+})
+
+test("setPassiveMode clears anchors when enabling and reset restores config", () => {
+    const state = createSessionState()
+    state.nudges.contextLimitAnchors.add("msg_assistant")
+    state.nudges.turnNudgeAnchors.add("msg_assistant")
+    state.nudges.iterationNudgeAnchors.add("msg_assistant")
+    const config = buildConfig()
+
+    setPassiveMode(state, config, "on")
+    assert.equal(effectivePassiveMode(state, config), true)
+    assert.equal(state.nudges.contextLimitAnchors.size, 0)
+    assert.equal(state.nudges.turnNudgeAnchors.size, 0)
+    assert.equal(state.nudges.iterationNudgeAnchors.size, 0)
+
+    setPassiveMode(state, config, "reset")
+    assert.equal(state.passiveModeOverride, undefined)
+    assert.equal(effectivePassiveMode(state, config), false)
+    assert.equal(passiveModeSource(state), "config")
 })
 
 test("passive mode does not disable deduplication or error purging", () => {

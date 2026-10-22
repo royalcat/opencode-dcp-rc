@@ -2,6 +2,11 @@ import { tool } from "@opencode-ai/plugin"
 
 const z = tool.schema
 const session = z.object({ sessionID: z.string() })
+const passiveModeSource = z.enum(["config", "session"])
+const passiveState = z.object({
+    passiveMode: z.boolean(),
+    passiveModeSource,
+})
 const compressionUsage = z.object({
     calls: z.number(),
     providerCalls: z.number(),
@@ -48,11 +53,19 @@ export const rpc = {
             input: session,
             output: z.object({
                 passiveMode: z.boolean(),
+                passiveModeSource,
                 canCompress: z.boolean(),
                 blockedReason: z.string().optional(),
                 context,
                 stats,
             }),
+        },
+        setPassive: {
+            input: z.object({
+                sessionID: z.string(),
+                mode: z.enum(["on", "off", "reset"]),
+            }),
+            output: passiveState,
         },
     },
     events: {},

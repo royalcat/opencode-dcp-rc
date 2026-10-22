@@ -41,6 +41,8 @@ export interface PersistedNudges {
 
 export interface PersistedSessionState {
     sessionName?: string
+    /** Session-scoped passive-mode override; absent follows config. */
+    passiveMode?: boolean
     prune: PersistedPrune
     nudges: PersistedNudges
     stats: SessionStats
@@ -94,6 +96,7 @@ export async function saveSessionState(
 
         const state: PersistedSessionState = {
             sessionName: sessionName,
+            passiveMode: sessionState.passiveModeOverride,
             prune: {
                 tools: Object.fromEntries(sessionState.prune.tools),
                 messages: serializePruneMessagesState(sessionState.prune.messages),
@@ -145,6 +148,13 @@ export async function loadSessionState(
                 sessionId: sessionId,
             })
             return null
+        }
+
+        if (state.passiveMode !== undefined && typeof state.passiveMode !== "boolean") {
+            logger.warn("Ignoring malformed passiveMode in session state", {
+                sessionId: sessionId,
+            })
+            state.passiveMode = undefined
         }
 
         const rawContextLimitAnchors = Array.isArray(state.nudges.contextLimitAnchors)

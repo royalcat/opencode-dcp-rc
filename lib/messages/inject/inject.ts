@@ -4,6 +4,7 @@ import type { PluginConfig } from "../../config"
 import type { RuntimePrompts } from "../../prompts/store"
 import { formatMessageIdTag } from "../../message-ids"
 import { compressPermission } from "../../compress-permission"
+import { effectivePassiveMode } from "../../passive-mode"
 import {
     getLastUserMessage,
     isIgnoredUserMessage,
@@ -41,7 +42,7 @@ export const injectCompressNudges = (
         return
     }
 
-    if (config.passiveMode) {
+    if (effectivePassiveMode(state, config)) {
         if (
             state.nudges.contextLimitAnchors.size > 0 ||
             state.nudges.turnNudgeAnchors.size > 0 ||

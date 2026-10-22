@@ -243,3 +243,38 @@ export function ActionRow(props: {
         </box>
     )
 }
+
+export function ToggleRow(props: {
+    theme: Theme
+    title: string
+    value: string
+    detail: string
+    accent: ThemeColor
+    onClick: () => void
+}) {
+    const accent = props.theme[props.accent]
+    return (
+        <box
+            flexDirection="row"
+            justifyContent="space-between"
+            paddingLeft={1}
+            paddingRight={1}
+            onMouseUp={props.onClick}
+        >
+            <box flexDirection="row" gap={2}>
+                <box width={12}>
+                    <text fg={props.theme.primary}>
+                        <b>{props.title}</b>
+                    </text>
+                </box>
+                <text fg={accent}>
+                    <b>{props.value}</b>
+                </text>
+                <text fg={props.theme.textMuted}>{props.detail}</text>
+            </box>
+            <box paddingLeft={2} paddingRight={2} backgroundColor={accent}>
+                <text fg={props.theme.selectedListItemText}>toggle</text>
+            </box>
+        </box>
+    )
+}

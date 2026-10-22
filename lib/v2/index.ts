@@ -36,6 +36,7 @@ import { matchesGlob } from "../protected-patterns"
 import { history, project } from "./messages"
 import { analyzeContextTokens } from "../commands/context"
 import { buildStatsReport } from "../commands/stats"
+import { effectivePassiveMode, passiveModeSource, setPassiveMode } from "../passive-mode"
 import { rpc } from "./rpc"
 
 // Extension point for future model-invisible V2 reports. Never use synthetic()
@@ -423,7 +424,8 @@ export async function setup(ctx: Plugin.Context) {
                 const { state, messages } = await load(sessionID)
                 syncCompressionBlocks(state, logger, messages)
                 return {
-                    passiveMode: config.passiveMode,
+                    passiveMode: effectivePassiveMode(state, config),
+                    passiveModeSource: passiveModeSource(state),
                     canCompress:
                         state.compressPermission === "allow" &&
                         (!state.isSubAgent || config.experimental.allowSubAgents),
@@ -435,6 +437,16 @@ export async function setup(ctx: Plugin.Context) {
                         : {}),
                     context: analyzeContextTokens(state, messages),
                     stats: await buildStatsReport(state, logger),
+                }
+            }),
+        setPassive: ({ sessionID, mode }) =>
+            serial(sessionID, async () => {
+                const { state } = await load(sessionID)
+                setPassiveMode(state, config, mode)
+                await saveSessionState(state, logger)
+                return {
+                    passiveMode: effectivePassiveMode(state, config),
+                    passiveModeSource: passiveModeSource(state),
                 }
             }),
     })

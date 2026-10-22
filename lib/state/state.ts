@@ -62,6 +62,7 @@ export function createSessionState(idFormat: IdFormat = "xml"): SessionState {
         sessionId: null,
         isSubAgent: false,
         compressPermission: undefined,
+        passiveModeOverride: undefined,
         prune: {
             tools: new Map<string, number>(),
             messages: createPruneMessagesState(),
@@ -99,6 +100,7 @@ export function resetSessionState(state: SessionState): void {
     state.sessionId = null
     state.isSubAgent = false
     state.compressPermission = undefined
+    state.passiveModeOverride = undefined
     state.prune = {
         tools: new Map<string, number>(),
         messages: createPruneMessagesState(),
@@ -167,6 +169,9 @@ export async function ensureSessionInitialized(
     state.nudges.iterationNudgeAnchors = new Set<string>(
         persisted.nudges.iterationNudgeAnchors || [],
     )
+    if (typeof persisted.passiveMode === "boolean") {
+        state.passiveModeOverride = persisted.passiveMode
+    }
     state.stats = {
         pruneTokenCounter: persisted.stats?.pruneTokenCounter || 0,
         totalPruneTokens: persisted.stats?.totalPruneTokens || 0,

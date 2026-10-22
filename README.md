@@ -127,6 +127,13 @@ Passive mode only silences nudges. Deduplication and error purging follow
 `/dcp-compress` still asks the model to compress on demand in both Free and
 Passive mode.
 
+The mode can also be changed for a running session: `/dcp passive on|off|reset`
+or the **Passive mode** row in the DCP panel overrides `passiveMode` for the
+current session. The override is stored with the session's DCP state, survives
+restarts, and never edits the conversation; only nudge injection into the next
+outgoing request changes. `reset` returns to the `dcp-rc.jsonc` default, and new
+sessions always start from config.
+
 `scrubModelOutput` removes DCP tags and reminder blocks the model may echo into
 its reply; `scrubMessageIds` also removes message-ID refs (`@N@`, `@bN@`,
 `@blocked@`) that appear alone on a line. Both default to `true` and are
@@ -327,9 +334,10 @@ Each level overrides the previous, so project settings take priority over global
 
 ### Commands
 
-DCP provides a TUI panel and one prompt-producing slash command:
+DCP provides a TUI panel and these commands:
 
 - `/dcp` — Opens the DCP panel with context and stats.
+- `/dcp passive [on|off|reset]` — Overrides passive mode for the current session without adding a message to the conversation.
 - `/dcp-compress [focus]` — Asks the model to compress the context now. Optional focus text directs what content to compress.
 
 ### Prompt Overrides

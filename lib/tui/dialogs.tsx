@@ -3,7 +3,7 @@
 import type { analyzeContextTokens } from "../commands/context"
 import { formatTokenCount } from "../ui/utils"
 import { formatDuration, formatRatio } from "./format"
-import { ActionRow, Card, DcpFrame, Metric, Progress, PromptRow, StatusPill } from "./ui"
+import { ActionRow, Card, DcpFrame, Metric, Progress, PromptRow, StatusPill, ToggleRow } from "./ui"
 import type { StatsReport, ViewApi } from "./types"
 
 export function StatusDialog(props: {
@@ -176,10 +176,12 @@ export function StatsDialog(props: { api: ViewApi; report: StatsReport; onBack: 
 export function PanelDialog(props: {
     api: ViewApi
     passiveMode: boolean
+    passiveModeSource: "config" | "session"
     canCompress: boolean
     blockedReason?: string
     onContext: () => void
     onStats: () => void
+    onTogglePassive: () => void
 }) {
     const theme = props.api.theme.current
     const canCompress = props.canCompress
@@ -216,11 +218,17 @@ export function PanelDialog(props: {
                 )}
             </Card>
             <Card theme={theme} title="Session State">
-                <StatusPill
+                <ToggleRow
                     theme={theme}
-                    label="Nudges"
-                    value={props.passiveMode ? "passive (off)" : "enabled"}
+                    title="Passive mode"
+                    value={props.passiveMode ? "passive" : "enabled"}
+                    detail={
+                        props.passiveModeSource === "session"
+                            ? "session override"
+                            : "config default"
+                    }
                     accent={props.passiveMode ? "warning" : "success"}
+                    onClick={props.onTogglePassive}
                 />
                 <StatusPill
                     theme={theme}
