@@ -16,6 +16,7 @@
 
 import type { Plugin } from "@opencode/plugin"
 import type { Logger } from "../logger"
+import type { StealthConfig } from "../config"
 
 export interface OutputScrubConfig {
     /** Strip `<dcp...>` reminder/tag blocks from model output. */
@@ -26,6 +27,22 @@ export interface OutputScrubConfig {
 
 export function outputScrubEnabled(config: OutputScrubConfig): boolean {
     return config.modelOutput || config.messageIds
+}
+
+/**
+ * Resolves the effective response scrubbers. `stealth.enabled` is the master
+ * switch: when it is off, every artifact is passed through untouched.
+ */
+export function resolveOutputScrubConfig(stealth: StealthConfig): OutputScrubConfig {
+    return {
+        modelOutput: stealth.enabled && stealth.scrubModelOutput,
+        messageIds: stealth.enabled && stealth.scrubMessageIds,
+    }
+}
+
+/** Request-side echo stripping follows the same master switch. */
+export function stripEchoesEnabled(stealth: StealthConfig): boolean {
+    return stealth.enabled
 }
 
 // Local copies of the request-side patterns in lib/messages/utils.ts. They are

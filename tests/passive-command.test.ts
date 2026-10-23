@@ -18,6 +18,11 @@ function buildConfig(overrides: Partial<PluginConfig> = {}): PluginConfig {
         turnProtection: { enabled: false, turns: 4 },
         experimental: { allowSubAgents: false, customPrompts: false },
         protectedFilePatterns: [],
+        stealth: {
+            enabled: true,
+            scrubModelOutput: true,
+            scrubMessageIds: true,
+        },
         compress: {
             permission: "allow",
             showCompression: false,
@@ -30,8 +35,6 @@ function buildConfig(overrides: Partial<PluginConfig> = {}): PluginConfig {
             protectedTools: [],
             protectTags: false,
             protectUserMessages: false,
-            scrubModelOutput: true,
-            scrubMessageIds: true,
         },
         strategies: {
             deduplication: { enabled: true, protectedTools: [] },

@@ -11,7 +11,12 @@ import {
     installCompressionUsageHook,
     installHttpUsageHook,
 } from "./usage"
-import { installResponseScrubHook, type OutputScrubConfig } from "./scrub"
+import {
+    installResponseScrubHook,
+    resolveOutputScrubConfig,
+    stripEchoesEnabled,
+    type OutputScrubConfig,
+} from "./scrub"
 import { createCommandExecuteHandler, createSystemPromptHandler } from "../hooks"
 import {
     createSessionState,
@@ -63,10 +68,7 @@ export async function setup(ctx: Plugin.Context) {
     }
     const logger = new Logger(config.debug)
     const usageTracker = createCompressionUsageTracker()
-    const scrub: OutputScrubConfig = {
-        modelOutput: config.compress.scrubModelOutput,
-        messageIds: config.compress.scrubMessageIds,
-    }
+    const scrub: OutputScrubConfig = resolveOutputScrubConfig(config.stealth)
     await installCompressionUsageHook(ctx, usageTracker, logger, scrub)
     await installHttpUsageHook(ctx, usageTracker, logger)
     await installResponseScrubHook(ctx, scrub, logger)
@@ -203,7 +205,9 @@ export async function setup(ctx: Plugin.Context) {
                     agent: event.agent,
                     model: event.model,
                 })
-                stripHallucinations(view.messages, state.idFormat)
+                if (stripEchoesEnabled(config.stealth)) {
+                    stripHallucinations(view.messages, state.idFormat)
+                }
                 assignMessageRefs(state, view.messages)
                 // Compaction may select only a prefix; block origins can be in the retained tail.
                 syncCompressionBlocks(state, logger, messages)

@@ -17,7 +17,8 @@ tags, nudges, and summary replacement only ever exist in the outgoing model
 request. The user's stored history is never rewritten, and the only
 user-visible artifact is the `compress` tool call itself. If the model echoes
 injected tags or reminders into its reply, the fork strips them from the
-response before OpenCode stores or displays it.
+response before OpenCode stores or displays it. The `stealth` section (on by
+default) controls this cleanup layer; injection itself stays fixed.
 
 ## How it differs from upstream DCP
 
@@ -30,10 +31,11 @@ response before OpenCode stores or displays it.
 
 - **OpenCode V2 only.** No V1 support and no upstream `range`/`message` modes.
 
-- **Invisible by design.** Hiding is the intended behavior, not a setting: injected
-  prompts, message IDs, and nudges exist only in the request copy sent to the
-  model, stored history is never rewritten, and the only visible artifact is the
-  `compress` tool call and its result.
+- **Invisible by default.** Injected prompts, message IDs, and nudges exist only
+  in the request copy sent to the model, stored history is never rewritten, and
+  the only visible artifact is the `compress` tool call and its result. The
+  `stealth` section (on by default) controls the cleanup layer; disabling it
+  keeps echoed artifacts for debugging.
 
 - **Fork names.** Package `@royalcat/opencode-dcp-rc`, config `dcp-rc.jsonc` /
   `dcp-rc.json`, and no self-update. Commands and prompt overrides keep upstream
@@ -41,8 +43,8 @@ response before OpenCode stores or displays it.
 
 - **Echoes are filtered.** Models sometimes copy injected reminders or message-ID
   tags into their replies. The fork scrubs those copies from the model response
-  before OpenCode stores or displays it. Controlled by
-  `compress.scrubModelOutput` and `compress.scrubMessageIds` (both on by
+  before OpenCode stores or displays it. Controlled by `stealth.enabled` (master
+  switch) and `stealth.scrubModelOutput` / `stealth.scrubMessageIds` (both on by
   default); it never touches tool-call arguments, so working with DCP files or
   quoting tags intentionally still works.
 
@@ -94,12 +96,16 @@ Settings → Extensions.
     "enabled": true,
     // Passive: keep the compress tool, suppress every periodic nudge.
     "passiveMode": false,
+    // Invisibility layer: keep echoed DCP artifacts out of replies.
+    "stealth": {
+        "enabled": true,
+        "scrubModelOutput": true,
+        "scrubMessageIds": true,
+    },
     "compress": {
         "permission": "allow",
         "minContextLimit": "20%",
         "maxContextLimit": "80%",
-        "scrubModelOutput": true,
-        "scrubMessageIds": true,
     },
     "pruneNotification": "off",
 }
@@ -134,10 +140,16 @@ restarts, and never edits the conversation; only nudge injection into the next
 outgoing request changes. `reset` returns to the `dcp-rc.jsonc` default, and new
 sessions always start from config.
 
-`scrubModelOutput` removes DCP tags and reminder blocks the model may echo into
-its reply; `scrubMessageIds` also removes message-ID refs (`@N@`, `@bN@`,
-`@blocked@`) that appear alone on a line. Both default to `true` and are
-kill-switches only — for example to debug the raw model output.
+`stealth.enabled` is the master switch for the invisibility layer. When it is on
+(default), `stealth.scrubModelOutput` removes DCP tags and reminder blocks the
+model may echo into its reply, and `stealth.scrubMessageIds` removes message-ID
+refs that appear alone on a line. Setting `stealth.enabled` to `false` keeps
+every echoed artifact and also disables the request-side echo cleanup — useful
+for debugging raw model output. Injection and compression are unaffected.
+
+The legacy `compress.scrubModelOutput` / `compress.scrubMessageIds` keys still
+work as deprecated aliases; the `stealth` keys win when both are set in the same
+config layer.
 
 ## Status and limitations
 
@@ -266,6 +278,12 @@ Each level overrides the previous, so project settings take priority over global
     // Protect file operations from pruning via glob patterns
     // Patterns match tool parameters.filePath (e.g. read/write/edit)
     "protectedFilePatterns": [],
+    // Invisibility layer: strip echoed DCP artifacts from replies and later requests
+    "stealth": {
+        "enabled": true,
+        "scrubModelOutput": true,
+        "scrubMessageIds": true,
+    },
     // Unified context compression tool and behavior settings
     "compress": {
         // Permission mode: "allow" (no prompt), "ask" (prompt), "deny" (tool not registered)

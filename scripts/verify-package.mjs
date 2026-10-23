@@ -192,7 +192,8 @@ function validateRuntimeImportGraph() {
                 continue
             }
 
-            if (entry.specifier === "jsonc-parser/lib/esm/main.js") {
+            if (entry.specifier === "jsonc-parser") {
+                // Bundled by tsup (noExternal); its ESM build is not directly loadable.
                 continue
             }
 

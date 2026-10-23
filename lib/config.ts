@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync, statSync } from "fs"
 import { join, dirname } from "path"
 import { homedir } from "os"
-import { parse } from "jsonc-parser/lib/esm/main.js"
+import { parse } from "jsonc-parser"
 import type { PluginInput } from "@opencode-ai/plugin"
 
 type ConfigContext = Pick<PluginInput, "directory"> & {
@@ -35,8 +35,21 @@ export interface CompressConfig {
     protectedTools: string[]
     protectTags: boolean
     protectUserMessages: boolean
+}
+
+export interface StealthConfig {
+    /** Master switch for the invisibility layer; false keeps every artifact (debug). */
+    enabled: boolean
+    /** Strip DCP reminder/tag blocks the model echoes into its reply or reasoning. */
     scrubModelOutput: boolean
+    /** Strip line-standalone message-ID refs the model echoes into its reply or reasoning. */
     scrubMessageIds: boolean
+}
+
+export const DEFAULT_STEALTH_CONFIG: StealthConfig = {
+    enabled: true,
+    scrubModelOutput: true,
+    scrubMessageIds: true,
 }
 
 export interface Commands {
@@ -72,6 +85,7 @@ export interface PluginConfig {
     turnProtection: TurnProtection
     experimental: ExperimentalConfig
     protectedFilePatterns: string[]
+    stealth: StealthConfig
     compress: CompressConfig
     strategies: {
         deduplication: Deduplication
@@ -130,6 +144,10 @@ export const VALID_CONFIG_KEYS = new Set([
     "compress.protectUserMessages",
     "compress.scrubModelOutput",
     "compress.scrubMessageIds",
+    "stealth",
+    "stealth.enabled",
+    "stealth.scrubModelOutput",
+    "stealth.scrubMessageIds",
     "strategies",
     "strategies.deduplication",
     "strategies.deduplication.enabled",
@@ -163,6 +181,16 @@ export function getInvalidConfigKeys(userConfig: Record<string, any>): string[] 
     return userKeys.filter((key) => !VALID_CONFIG_KEYS.has(key))
 }
 
+/** Legacy keys still accepted, mapped to their replacement. */
+export const DEPRECATED_CONFIG_KEYS: Record<string, string> = {
+    "compress.scrubModelOutput": "stealth.scrubModelOutput",
+    "compress.scrubMessageIds": "stealth.scrubMessageIds",
+}
+
+export function getDeprecatedConfigKeys(userConfig: Record<string, any>): string[] {
+    return getConfigKeyPaths(userConfig).filter((key) => key in DEPRECATED_CONFIG_KEYS)
+}
+
 interface ValidationError {
     key: string
     expected: string
@@ -186,6 +214,30 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
 
     if (config.debug !== undefined && typeof config.debug !== "boolean") {
         errors.push({ key: "debug", expected: "boolean", actual: typeof config.debug })
+    }
+
+    if (config.stealth !== undefined) {
+        if (
+            typeof config.stealth !== "object" ||
+            config.stealth === null ||
+            Array.isArray(config.stealth)
+        ) {
+            errors.push({
+                key: "stealth",
+                expected: "object",
+                actual: typeof config.stealth,
+            })
+        } else {
+            for (const key of ["enabled", "scrubModelOutput", "scrubMessageIds"] as const) {
+                if (config.stealth[key] !== undefined && typeof config.stealth[key] !== "boolean") {
+                    errors.push({
+                        key: `stealth.${key}`,
+                        expected: "boolean",
+                        actual: typeof config.stealth[key],
+                    })
+                }
+            }
+        }
     }
 
     if (config.pruneNotification !== undefined) {
@@ -604,8 +656,9 @@ function showConfigWarnings(
 ): void {
     const invalidKeys = getInvalidConfigKeys(configData)
     const typeErrors = validateConfigTypes(configData)
+    const deprecatedKeys = getDeprecatedConfigKeys(configData)
 
-    if (invalidKeys.length === 0 && typeErrors.length === 0) {
+    if (invalidKeys.length === 0 && typeErrors.length === 0 && deprecatedKeys.length === 0) {
         return
     }
 
@@ -624,6 +677,15 @@ function showConfigWarnings(
         }
         if (typeErrors.length > 2) {
             messages.push(`(+${typeErrors.length - 2} more type errors)`)
+        }
+    }
+
+    if (deprecatedKeys.length > 0) {
+        for (const key of deprecatedKeys.slice(0, 2)) {
+            messages.push(`${key} is deprecated; use ${DEPRECATED_CONFIG_KEYS[key]}`)
+        }
+        if (deprecatedKeys.length > 2) {
+            messages.push(`(+${deprecatedKeys.length - 2} more deprecated keys)`)
         }
     }
 
@@ -660,6 +722,7 @@ const defaultConfig: PluginConfig = {
         customPrompts: false,
     },
     protectedFilePatterns: [],
+    stealth: { ...DEFAULT_STEALTH_CONFIG },
     compress: {
         permission: "allow",
         showCompression: false,
@@ -672,8 +735,6 @@ const defaultConfig: PluginConfig = {
         protectedTools: [...COMPRESS_DEFAULT_PROTECTED_TOOLS],
         protectTags: false,
         protectUserMessages: false,
-        scrubModelOutput: true,
-        scrubMessageIds: true,
     },
     strategies: {
         deduplication: {
@@ -760,6 +821,8 @@ function createDefaultConfig(): void {
   // Summaries are generated automatically after the model selects IDs
   // (compress tool), and pruneNotification = "off" keeps the plugin's
   // internals hidden; only the compress tool call is visible.
+  // The "stealth" section (on by default) keeps echoed DCP artifacts out
+  // of replies; disable it only to debug raw model output.
 }
 `
     writeFileSync(GLOBAL_CONFIG_PATH_JSONC, configContent, "utf-8")
@@ -820,6 +883,44 @@ function mergeStrategies(
     }
 }
 
+export function mergeStealth(
+    base: PluginConfig["stealth"],
+    override?: Partial<PluginConfig["stealth"]>,
+): PluginConfig["stealth"] {
+    if (!override) {
+        return base
+    }
+
+    return {
+        enabled: override.enabled ?? base.enabled,
+        scrubModelOutput: override.scrubModelOutput ?? base.scrubModelOutput,
+        scrubMessageIds: override.scrubMessageIds ?? base.scrubMessageIds,
+    }
+}
+
+/**
+ * Maps one config layer's `stealth` block and the legacy `compress.scrub*`
+ * aliases into a single override. New keys win over aliases in the same layer.
+ */
+export function resolveStealthLayer(
+    data: Record<string, any>,
+): Partial<PluginConfig["stealth"]> | undefined {
+    const stealth = data.stealth as Record<string, any> | undefined
+    const compress = data.compress as Record<string, any> | undefined
+    const aliasModelOutput = compress?.scrubModelOutput
+    const aliasMessageIds = compress?.scrubMessageIds
+
+    if (stealth === undefined && aliasModelOutput === undefined && aliasMessageIds === undefined) {
+        return undefined
+    }
+
+    return {
+        enabled: stealth?.enabled,
+        scrubModelOutput: stealth?.scrubModelOutput ?? aliasModelOutput,
+        scrubMessageIds: stealth?.scrubMessageIds ?? aliasMessageIds,
+    }
+}
+
 function mergeCompress(
     base: PluginConfig["compress"],
     override?: CompressOverride,
@@ -842,8 +943,6 @@ function mergeCompress(
         protectedTools: [...new Set([...base.protectedTools, ...(override.protectedTools ?? [])])],
         protectTags: override.protectTags ?? base.protectTags,
         protectUserMessages: override.protectUserMessages ?? base.protectUserMessages,
-        scrubModelOutput: override.scrubModelOutput ?? base.scrubModelOutput,
-        scrubMessageIds: override.scrubMessageIds ?? base.scrubMessageIds,
     }
 }
 
@@ -883,6 +982,7 @@ function deepCloneConfig(config: PluginConfig): PluginConfig {
         turnProtection: { ...config.turnProtection },
         experimental: { ...config.experimental },
         protectedFilePatterns: [...config.protectedFilePatterns],
+        stealth: { ...config.stealth },
         compress: {
             ...config.compress,
             modelMaxLimits: { ...config.compress.modelMaxLimits },
@@ -918,6 +1018,7 @@ function mergeLayer(config: PluginConfig, data: Record<string, any>): PluginConf
         protectedFilePatterns: [
             ...new Set([...config.protectedFilePatterns, ...(data.protectedFilePatterns ?? [])]),
         ],
+        stealth: mergeStealth(config.stealth, resolveStealthLayer(data)),
         compress: mergeCompress(config.compress, data.compress as CompressOverride),
         strategies: mergeStrategies(config.strategies, data.strategies as any),
     }

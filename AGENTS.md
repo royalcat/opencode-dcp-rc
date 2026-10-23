@@ -45,6 +45,7 @@ check, typecheck, build, test, `npm audit`.
 | Compression usage totals                | `lib/compress/usage.ts` (normalization, aggregation)                                      |
 | Compression usage tests                 | `tests/compression-usage.test.ts`                                                         |
 | Output scrub tests                      | `tests/output-scrub.test.ts`                                                              |
+| Stealth config + resolver tests         | `tests/stealth.test.ts`                                                                   |
 | Injected system prompt                  | `lib/prompts/system.ts` (+ `lib/prompts/store.ts`, `lib/prompts/extensions/system.ts`)    |
 | rc tool description                     | `lib/prompts/compress-rc.ts` (+ `lib/prompts/store.ts`, `lib/prompts/extensions/tool.ts`) |
 | Config loading/defaults                 | `lib/config.ts`, schema `dcp.schema.json`                                                 |
@@ -117,12 +118,13 @@ check, typecheck, build, test, `npm audit`.
    override lives in the session's DCP state, never edits stored messages, and only
    changes nudge injection on the next context hook; `reset` returns to config and
    new sessions start from config.
-9. Invisibility invariants (design goal, not configurable): transforms apply to the
-   outgoing copy only; injected metadata (ID tags, nudges, summary prompt, markers)
-   never enters stored history or user-visible output. The `compress` tool call and
-   its result (the model's selectors, e.g. `Compressed: m0004-m0008.`) are the one
-   intended user-visible artifact. Notifications are independent and opt-in
-   (`pruneNotification`, default `off`).
+9. Invisibility invariants: transforms apply to the outgoing copy only; injected
+   metadata (ID tags, nudges, summary prompt, markers) never enters stored history
+   or user-visible output. The `compress` tool call and its result (the model's
+   selectors, e.g. `Compressed: m0004-m0008.`) are the one intended user-visible
+   artifact. Notifications are independent and opt-in (`pruneNotification`, default
+   `off`). The cleanup layer is configurable through `stealth.enabled` (default
+   `true`); injection itself is not configurable.
 10. OpenCode V2 is required (`@opencode/plugin` ^2.0.22, verified on 2.0.4). V1 support
     and the upstream `range`/`message` modes were removed in 4.0.0.
 11. Token usage of the hidden requests is accounted for in stats: provider telemetry when
@@ -150,9 +152,12 @@ check, typecheck, build, test, `npm audit`.
     removes those echoes before OpenCode stores or displays them. SSE/JSON bodies on
     the `http.response` hook (OpenAI Responses/Chat, Anthropic, Google) and AI SDK
     text/reasoning parts are covered; tool-call arguments are never touched.
-    `compress.scrubModelOutput` / `compress.scrubMessageIds` (both default `true`)
-    are kill-switches. Forward-only: existing stored copies are not rewritten, and
-    WebSocket-transport providers are not covered.
+    `stealth.enabled` (master, default `true`) gates both halves: response
+    scrubbing via `stealth.scrubModelOutput` / `stealth.scrubMessageIds` (both
+    default `true`) and the request-side `stripHallucinations` pass. The legacy
+    `compress.scrubModelOutput` / `compress.scrubMessageIds` keys are deprecated
+    aliases; new keys win in the same config layer. Forward-only: existing stored
+    copies are not rewritten, and WebSocket-transport providers are not covered.
 
 13. Prompt text lives in `lib/prompts/`: `system.ts` (system prompt, injected on every
     request), `compress-rc.ts` (the rc `compress` tool description), the `*-nudge.ts`
@@ -239,7 +244,10 @@ was fixed; the rest is deliberately deferred.
   summary request from `tests/lab/mock.mjs`) persisted into `stats.compressionUsage`.
 - `tests/output-scrub.test.ts` covers response scrubbing: cross-chunk tag and ID
   removal, provider payload shapes, SSE/JSON transforms, tool-argument immunity,
-  aisdk parts, and the HTTP hook kill switch. The lab mock's default reply echoes a
+  aisdk parts, and the HTTP hook kill switch. `tests/stealth.test.ts` covers the
+  `stealth` config layer: defaults, legacy alias mapping and precedence,
+  deprecation detection, type validation, and the master gate for output scrubbing
+  plus request-side echo stripping. The lab mock's default reply echoes a
   `dcp-system-reminder` block and a standalone message-ID line; `rc-run.mjs` asserts
   neither reaches CLI output or the second run's stored context.
 - `tests/modes.test.ts` (replaces `manual-free-mode.test.ts` and

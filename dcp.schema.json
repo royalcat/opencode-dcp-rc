@@ -108,6 +108,33 @@
             "default": [],
             "description": "Glob patterns for files that should be protected from pruning (e.g., '**/*.config.ts')"
         },
+        "stealth": {
+            "type": "object",
+            "description": "Invisibility layer for DCP-injected metadata. Injection into outgoing requests is always on; this only controls whether echoed artifacts are removed from replies and later requests.",
+            "additionalProperties": false,
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Master switch. true keeps the plugin invisible: echoed DCP nudges/tags and message-ID refs are stripped from model output and later requests. false is a debugging passthrough that keeps every artifact."
+                },
+                "scrubModelOutput": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Strip DCP reminder/tag blocks that the model copies into its visible reply or reasoning before the message is stored."
+                },
+                "scrubMessageIds": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Strip line-standalone message-ID refs (numeric or block form) that the model copies into its visible reply or reasoning before the message is stored."
+                }
+            },
+            "default": {
+                "enabled": true,
+                "scrubModelOutput": true,
+                "scrubMessageIds": true
+            }
+        },
         "compress": {
             "type": "object",
             "description": "Configuration for the unified compress tool (selection-only rc mode)",
@@ -224,12 +251,12 @@
                 "scrubModelOutput": {
                     "type": "boolean",
                     "default": true,
-                    "description": "Strip DCP reminder/tag blocks that the model copies into its visible reply or reasoning before the message is stored."
+                    "description": "Deprecated alias for stealth.scrubModelOutput. Use the stealth key; it wins when both are set in the same config layer."
                 },
                 "scrubMessageIds": {
                     "type": "boolean",
                     "default": true,
-                    "description": "Strip line-standalone compact id tags (for example \"@42@\") that the model copies into its visible reply or reasoning before the message is stored."
+                    "description": "Deprecated alias for stealth.scrubMessageIds. Use the stealth key; it wins when both are set in the same config layer."
                 }
             },
             "default": {
