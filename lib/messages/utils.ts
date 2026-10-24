@@ -9,7 +9,8 @@ const DCP_PAIRED_TAG_REGEX = /<dcp[^>]*>[\s\S]*?<\/dcp[^>]*>/gi
 const DCP_UNPAIRED_TAG_REGEX = /<\/?dcp[^>]*>/gi
 const INJECTED_MESSAGE_ID_SUFFIX_REGEX = /(?<=\n)<dcp-message-id[^>]*>m\d+<\/dcp-message-id>\s*$/
 const HALLUCINATED_PARAMETER_SUFFIX_REGEX = /(?<=\n)m\d+<\/parameter>\s*$/
-const COMPACT_TAG_REGEX = /@(?:[1-9]\d*|b[1-9]\d*|blocked)@(?:[ \t]+\[(?:low|medium|high)\])?/gi
+const COMPACT_TRAILING_ID_LINE_REGEX =
+    /(^|\n)[ \t]*@(?:[1-9]\d*|b[1-9]\d*|blocked)@(?:[ \t]+\[(?:low|medium|high)\])?\s*$/i
 
 const generateStableId = (prefix: string, seed: string): string => {
     const hash = createHash("sha256").update(seed).digest("hex").slice(0, SUMMARY_ID_HASH_LENGTH)
@@ -162,13 +163,15 @@ export function buildToolIdList(state: SessionState, messages: WithParts[]): str
 }
 
 export const stripHallucinationsFromString = (text: string, format: IdFormat = "xml"): string => {
-    if (format === "compact") text = text.replace(COMPACT_TAG_REGEX, "")
-    const withoutKnownSuffixes = text
-        .replace(INJECTED_MESSAGE_ID_SUFFIX_REGEX, "")
-        .replace(HALLUCINATED_PARAMETER_SUFFIX_REGEX, "")
-    return withoutKnownSuffixes
+    const withoutDcpTags = text
         .replace(DCP_PAIRED_TAG_REGEX, "")
         .replace(DCP_UNPAIRED_TAG_REGEX, "")
+    const withoutKnownSuffixes = withoutDcpTags
+        .replace(INJECTED_MESSAGE_ID_SUFFIX_REGEX, "")
+        .replace(HALLUCINATED_PARAMETER_SUFFIX_REGEX, "")
+    return format === "compact"
+        ? withoutKnownSuffixes.replace(COMPACT_TRAILING_ID_LINE_REGEX, "$1")
+        : withoutKnownSuffixes
 }
 
 export const stripHallucinations = (messages: WithParts[], format: IdFormat = "xml"): void => {

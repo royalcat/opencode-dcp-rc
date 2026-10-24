@@ -80,7 +80,7 @@ test("V2 IDs are unpadded, distinct from blocks, and survive state resets", () =
     assert.equal(parseBoundaryId("@4@"), null)
 })
 
-test("V2 cleans echoed IDs before injecting protected/message tags", () => {
+test("V2 cleans echoed ID suffixes without stripping inline IDs", () => {
     const state = createSessionState("compact")
     const raw = messages("ses_cleanup")
     raw[1]!.parts = [
@@ -94,7 +94,8 @@ test("V2 cleans echoed IDs before injecting protected/message tags", () => {
     ] as WithParts["parts"]
     stripHallucinations(raw, state.idFormat)
     assert.equal((raw[1]!.parts[0] as any).text, "It’s 2026.\n")
-    assert.doesNotMatch(JSON.stringify(raw), /@9[89]@/)
+    assert.doesNotMatch((raw[1]!.parts[0] as any).text, /@99@/)
+    assert.equal((raw[1]!.parts[1] as any).state.output, "Result @98@  ")
 
     const settings = config()
     settings.compress.protectUserMessages = true
@@ -108,6 +109,30 @@ test("V2 cleans echoed IDs before injecting protected/message tags", () => {
         stripHallucinationsFromString("mail a@b.com; version 4; [high]", "compact"),
         "mail a@b.com; version 4; [high]",
     )
+})
+
+test("V2 removes only trailing compact ID lines", () => {
+    assert.equal(
+        stripHallucinationsFromString("see @42@ and @b3@ here", "compact"),
+        "see @42@ and @b3@ here",
+    )
+    assert.equal(stripHallucinationsFromString("tool output\n@42@", "compact"), "tool output\n")
+    assert.equal(stripHallucinationsFromString("tool output @42@", "compact"), "tool output @42@")
+    assert.equal(stripHallucinationsFromString("tool output\n  @42@  ", "compact"), "tool output\n")
+    assert.equal(
+        stripHallucinationsFromString("tool output\n@blocked@\n", "compact"),
+        "tool output\n",
+    )
+    assert.equal(
+        stripHallucinationsFromString("tool output\n@b2@ [high]", "compact"),
+        "tool output\n",
+    )
+    assert.equal(stripHallucinationsFromString("@42@ [low]\n", "compact"), "")
+    assert.equal(
+        stripHallucinationsFromString("Compressed: @140@-@170@.", "compact"),
+        "Compressed: @140@-@170@.",
+    )
+    assert.equal(stripHallucinationsFromString("tool output\n@42@", "xml"), "tool output\n@42@")
 })
 
 test("V2 block guidance lists active blocks for rc merging", () => {
