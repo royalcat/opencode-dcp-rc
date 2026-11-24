@@ -149,6 +149,7 @@ try {
     const reminderScrubbed =
         !visible.includes("dcp-system-reminder") &&
         !visible.includes("Echoed reminder body") &&
+        !visible.includes("Evaluate the conversation for compressible ranges") &&
         !visible.includes("@521@")
     assert.ok(reminderScrubbed, "scrubbed reminder leaked into user output")
 

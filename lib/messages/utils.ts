@@ -3,6 +3,7 @@ import type { SessionState, WithParts } from "../state"
 import { isMessageCompacted } from "../state/utils"
 import type { UserMessage } from "@opencode-ai/sdk/v2"
 import type { IdFormat } from "../message-ids"
+import { stripNudgeEchoes } from "../nudge-echoes"
 
 const SUMMARY_ID_HASH_LENGTH = 16
 const DCP_PAIRED_TAG_REGEX = /<dcp[^>]*>[\s\S]*?<\/dcp[^>]*>/gi
@@ -162,11 +163,16 @@ export function buildToolIdList(state: SessionState, messages: WithParts[]): str
     return toolIds
 }
 
-export const stripHallucinationsFromString = (text: string, format: IdFormat = "xml"): string => {
+export const stripHallucinationsFromString = (
+    text: string,
+    format: IdFormat = "xml",
+    stripEchoes = true,
+): string => {
     const withoutDcpTags = text
         .replace(DCP_PAIRED_TAG_REGEX, "")
         .replace(DCP_UNPAIRED_TAG_REGEX, "")
-    const withoutKnownSuffixes = withoutDcpTags
+    const withoutEchoes = stripEchoes ? stripNudgeEchoes(withoutDcpTags) : withoutDcpTags
+    const withoutKnownSuffixes = withoutEchoes
         .replace(INJECTED_MESSAGE_ID_SUFFIX_REGEX, "")
         .replace(HALLUCINATED_PARAMETER_SUFFIX_REGEX, "")
     return format === "compact"
@@ -186,7 +192,10 @@ export const stripHallucinations = (messages: WithParts[], format: IdFormat = "x
                 part.state?.status === "completed" &&
                 typeof part.state.output === "string"
             ) {
-                part.state.output = stripHallucinationsFromString(part.state.output, format)
+                // Tool output may legitimately contain prompt source (for
+                // example when the user edits the plugin), so only tag and id
+                // echoes are removed there.
+                part.state.output = stripHallucinationsFromString(part.state.output, format, false)
             }
         }
     }

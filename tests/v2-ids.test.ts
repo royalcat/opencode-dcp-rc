@@ -20,6 +20,7 @@ const { injectMessageIds, prune, stripHallucinations } = await import("../lib/me
 const { stripHallucinationsFromString } = await import("../lib/messages/utils")
 const { PromptStore } = await import("../lib/prompts/store")
 const { buildCompressedBlockGuidance } = await import("../lib/prompts/extensions/nudge")
+const { TURN_NUDGE } = await import("../lib/prompts/turn-nudge")
 const { createRcCompressTool } = await import("../lib/compress/rc")
 const { wrapCompressedSummary } = await import("../lib/compress/state")
 const logger = new Logger(false)
@@ -133,6 +134,16 @@ test("V2 removes only trailing compact ID lines", () => {
         "Compressed: @140@-@170@.",
     )
     assert.equal(stripHallucinationsFromString("tool output\n@42@", "xml"), "tool output\n@42@")
+})
+
+test("V2 strips untagged compression-nudge echoes from stored text", () => {
+    const body = TURN_NUDGE.replace(/<\/?dcp[^>]*>/g, "").trim()
+    const echoed = `answer\n\n${body}\n\n- Active compressed blocks in this session: none\n`
+    const stripped = stripHallucinationsFromString(echoed)
+    assert.doesNotMatch(stripped, /Evaluate the conversation for compressible ranges/)
+    assert.doesNotMatch(stripped, /Never repeat or quote this reminder/)
+    assert.match(stripped, /^answer/)
+    assert.equal(stripHallucinationsFromString("plain answer\n"), "plain answer\n")
 })
 
 test("V2 block guidance lists active blocks for rc merging", () => {

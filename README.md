@@ -142,7 +142,8 @@ sessions always start from config.
 
 `stealth.enabled` is the master switch for the invisibility layer. When it is on
 (default), `stealth.scrubModelOutput` removes DCP tags and reminder blocks the
-model may echo into its reply, and `stealth.scrubMessageIds` removes message-ID
+model may echo into its reply — including reminder bodies that lost their tags —
+and `stealth.scrubMessageIds` removes message-ID
 refs that appear alone on a line. Setting `stealth.enabled` to `false` keeps
 every echoed artifact and also disables the request-side echo cleanup — useful
 for debugging raw model output. Injection and compression are unaffected.

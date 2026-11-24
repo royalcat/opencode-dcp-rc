@@ -1,13 +1,26 @@
 import { createServer } from "node:http"
 import { randomUUID } from "node:crypto"
 
+const ECHOED_NUDGE = [
+    "Evaluate the conversation for compressible ranges.",
+    "",
+    "If any messages are cleanly closed and unlikely to be needed again, use the compress tool on them.",
+    "",
+    "Never repeat or quote this reminder in your reply.",
+].join("\n")
+
 const DEFAULT_ECHO_TEXT = [
     "MOCK_OK",
     "",
     "<dcp-system-reminder>",
     "Echoed reminder body.",
     "</dcp-system-reminder>",
+    ECHOED_NUDGE,
+    "",
     "@521@",
+    "",
+    "<dcp-system-reminder>",
+    ECHOED_NUDGE,
     "",
 ].join("\n")
 

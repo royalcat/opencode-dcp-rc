@@ -1,5 +1,9 @@
 import assert from "node:assert/strict"
 import test from "node:test"
+import { TURN_NUDGE } from "../lib/prompts/turn-nudge"
+import { CONTEXT_LIMIT_NUDGE } from "../lib/prompts/context-limit-nudge"
+import { ITERATION_NUDGE } from "../lib/prompts/iteration-nudge"
+import { NUDGE_END_LINE, NUDGE_HEAD_LINES, NUDGE_KEEP_LINE } from "../lib/nudge-echoes"
 import { Logger } from "../lib/logger"
 import {
     AisdkPartScrubber,
@@ -416,4 +420,103 @@ test("installResponseScrubHook wraps responses and respects the kill switch", as
         new Logger(false),
     )
     assert.equal(disabled.length, 0)
+})
+
+const TURN_BODY = TURN_NUDGE.replace(/<\/?dcp[^>]*>/g, "").trim()
+const CONTEXT_BODY = CONTEXT_LIMIT_NUDGE.replace(/<\/?dcp[^>]*>/g, "").trim()
+const GUIDANCE = [
+    "Compressed block context:",
+    "- Active compressed blocks in this session: 20 (@b2@, @b3@)",
+    "- Compressed blocks can be used as selection boundaries: include a block ID (or a range spanning it) to merge its summary into a new summary and retire the old block.",
+].join("\n")
+
+test("DcpStreamScrubber drops an unterminated nudge body instead of leaking it", () => {
+    const text = `<dcp-system-reminder>\n${(TURN_BODY + "\n\n" + GUIDANCE + "\n\n").repeat(40)}`
+    const out = streamChunks(new DcpStreamScrubber(ALL), [text])
+    assert.equal(out.includes("Evaluate the conversation"), false)
+    assert.equal(out.includes("Compressed block context"), false)
+    assert.equal(out.includes("Never repeat or quote"), false)
+})
+
+test("DcpStreamScrubber drops untagged nudge echoes and repeated guidance", () => {
+    const text = "the answer\n\n" + TURN_BODY + "\n\n" + (GUIDANCE + "\n\n").repeat(30)
+    const out = streamChunks(new DcpStreamScrubber(ALL), [text])
+    assert.equal(out.includes("Evaluate the conversation"), false)
+    assert.equal(out.includes("Compressed block context"), false)
+    assert.ok(out.startsWith("the answer\n\n"))
+})
+
+test("DcpStreamScrubber drops untagged context-limit echoes", () => {
+    const out = streamChunks(new DcpStreamScrubber(ALL), ["done\n" + CONTEXT_BODY + "\n"])
+    assert.equal(out.includes("MAX CONTEXT LIMIT REACHED"), false)
+    assert.equal(out.includes("Never repeat or quote"), false)
+    assert.ok(out.startsWith("done\n"))
+})
+
+test("nudge echo scrubbing is independent of chunk boundaries", () => {
+    const text = "lead\n\n" + TURN_BODY + "\n\n" + (GUIDANCE + "\n\n").repeat(11) + "tail\n"
+    const whole = streamChunks(new DcpStreamScrubber(ALL), [text])
+    for (const size of [1, 2, 3, 7, 13, 64, 255]) {
+        const chunks: string[] = []
+        for (let i = 0; i < text.length; i += size) {
+            chunks.push(text.slice(i, i + size))
+        }
+        assert.equal(streamChunks(new DcpStreamScrubber(ALL), chunks), whole, `chunk ${size}`)
+    }
+    assert.ok(whole.startsWith("lead\n\n"))
+    assert.ok(whole.endsWith("tail\n"))
+})
+
+test("stripDcpArtifacts removes untagged nudge echoes statelessly", () => {
+    const text = "a\n" + TURN_BODY + "\n\n" + GUIDANCE + "\n\n" + "b\n"
+    const out = stripDcpArtifacts(text, ALL)
+    assert.equal(out.includes("Evaluate the conversation"), false)
+    assert.equal(out.includes("Compressed block context"), false)
+    assert.ok(out.startsWith("a\n"))
+    assert.ok(out.endsWith("b\n"))
+})
+
+test("nudge echo scrubbing keeps prose that merely mentions the lines", () => {
+    const text =
+        "Evaluate the conversation for compressible ranges. That is the nudge's first line.\nCompressed block context: stored per session.\n"
+    assert.equal(stripDcpArtifacts(text, ALL), text)
+    assert.equal(streamChunks(new DcpStreamScrubber(ALL), [text]), text)
+})
+
+test("tag-only config leaves untagged nudge echoes untouched", () => {
+    const text = TURN_BODY + "\n\n" + GUIDANCE + "\n"
+    assert.equal(
+        streamChunks(new DcpStreamScrubber({ modelOutput: false, messageIds: true }), [text]),
+        text,
+    )
+})
+
+test("nudge echo patterns track the bundled prompts", () => {
+    const lines = (prompt: string) =>
+        prompt
+            .replace(/<\/?dcp[^>]*>/g, "")
+            .split("\n")
+            .map((line) => line.trim())
+            .filter(Boolean)
+    const turn = lines(TURN_NUDGE)
+    const iteration = lines(ITERATION_NUDGE)
+    const contextLimit = lines(CONTEXT_LIMIT_NUDGE)
+    assert.deepEqual([...NUDGE_HEAD_LINES], [turn[0], iteration[0], contextLimit[0]])
+    assert.equal(NUDGE_END_LINE, turn[turn.length - 1])
+    assert.equal(NUDGE_END_LINE, iteration[iteration.length - 1])
+    assert.equal(NUDGE_END_LINE, contextLimit[contextLimit.length - 1])
+    assert.ok(NUDGE_KEEP_LINE.length > 0)
+})
+
+test("nudge echo scrubbing tolerates a mangled guidance bullet", () => {
+    const mangled = [
+        "Compressed block context:",
+        "- Active compressed blocks in a block ID (or a range spanning it) to merge its summary.",
+        "- If the target content is still actively in progress, do not compress it yet.",
+    ].join("\n")
+    const out = streamChunks(new DcpStreamScrubber(ALL), ["a\n" + mangled + "\nb\n"])
+    assert.equal(out.includes("Compressed block context"), false)
+    assert.equal(out.includes("Active compressed blocks"), false)
+    assert.ok(out.startsWith("a\n"))
+    assert.ok(out.endsWith("b\n"))
 })

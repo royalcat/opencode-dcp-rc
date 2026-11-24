@@ -17,6 +17,7 @@
 import type { Plugin } from "@opencode/plugin"
 import type { Logger } from "../logger"
 import type { StealthConfig } from "../config"
+import { NudgeEchoStripper, classifyNudgeBodyPrefix, stripNudgeEchoes } from "../nudge-echoes"
 
 export interface OutputScrubConfig {
     /** Strip `<dcp...>` reminder/tag blocks from model output. */
@@ -117,7 +118,9 @@ function isIdPriorityPrefix(text: string): boolean {
 export function stripDcpArtifacts(text: string, config: OutputScrubConfig): string {
     let out = text
     if (config.modelOutput) {
-        out = out.replace(DCP_PAIRED_TAG_REGEX, "").replace(DCP_UNPAIRED_TAG_REGEX, "")
+        out = stripNudgeEchoes(
+            out.replace(DCP_PAIRED_TAG_REGEX, "").replace(DCP_UNPAIRED_TAG_REGEX, ""),
+        )
     }
     if (config.messageIds && out.includes("\n")) {
         out = out
@@ -158,6 +161,7 @@ type TagMode = "text" | "open" | "close" | "block"
 class DcpTagStripper {
     private mode: TagMode = "text"
     private carry = ""
+    private knownNudge: boolean | undefined = undefined
 
     push(chunk: string): string {
         this.carry += chunk
@@ -207,23 +211,36 @@ class DcpTagStripper {
                 const wasOpen = this.mode === "open"
                 this.carry = this.carry.slice(end + 1)
                 this.mode = wasOpen ? "block" : "text"
+                this.knownNudge = undefined
                 continue
             }
             // Inside a paired block: drop everything through the closing tag.
+            if (this.knownNudge === undefined && this.carry.length <= 4096) {
+                this.knownNudge = classifyNudgeBodyPrefix(this.carry)
+            }
             const close = this.carry.toLowerCase().indexOf(TAG_CLOSE)
             if (close !== -1) {
                 const end = this.carry.indexOf(">", close)
                 if (end !== -1) {
                     this.carry = this.carry.slice(end + 1)
                     this.mode = "text"
+                    this.knownNudge = undefined
                     continue
                 }
             }
             if (this.carry.length > MAX_BLOCK_LENGTH) {
-                // Never seen a closing tag; fail open with the buffered body.
-                out += this.carry
-                this.carry = ""
-                this.mode = "text"
+                if (this.knownNudge === true) {
+                    // This is our own reminder body; the model lost the closing
+                    // tag. Drop it instead of leaking it to the user.
+                    this.carry = ""
+                    this.mode = "text"
+                    this.knownNudge = undefined
+                } else {
+                    // Never seen a closing tag; fail open with the buffered body.
+                    out += this.carry
+                    this.carry = ""
+                    this.mode = "text"
+                }
             }
             break
         }
@@ -231,17 +248,20 @@ class DcpTagStripper {
     }
 
     flush(): string {
-        // A body without a closing tag is released (unpaired-tag semantics); a
-        // partial tag or closing marker has no useful content and is dropped.
-        const out = this.mode === "block" ? this.carry : ""
+        // A body without a closing tag is normally released (unpaired-tag
+        // semantics); a recognized nudge body is ours and is dropped. A partial
+        // tag or closing marker has no useful content and is dropped.
+        const out = this.mode === "block" && this.knownNudge !== true ? this.carry : ""
         this.carry = ""
         this.mode = "text"
+        this.knownNudge = undefined
         return out
     }
 
     reset(): void {
         this.carry = ""
         this.mode = "text"
+        this.knownNudge = undefined
     }
 }
 
@@ -285,9 +305,10 @@ class IdLineStripper {
     }
 }
 
-/** Streaming text scrubber: tag blocks first, then compact-id lines. */
+/** Streaming text scrubber: tag blocks first, then nudge echoes, then ids. */
 export class DcpStreamScrubber {
     private readonly tags = new DcpTagStripper()
+    private readonly echoes = new NudgeEchoStripper()
     private readonly ids = new IdLineStripper()
 
     constructor(private readonly config: OutputScrubConfig) {}
@@ -296,6 +317,7 @@ export class DcpStreamScrubber {
         let out = chunk
         if (this.config.modelOutput) {
             out = this.tags.push(out)
+            out = this.echoes.push(out)
         }
         if (this.config.messageIds) {
             out = this.ids.push(out)
@@ -304,7 +326,10 @@ export class DcpStreamScrubber {
     }
 
     flush(): string {
-        let out = this.config.modelOutput ? this.tags.flush() : ""
+        let out = ""
+        if (this.config.modelOutput) {
+            out = this.echoes.push(this.tags.flush()) + this.echoes.flush()
+        }
         if (out && this.config.messageIds) {
             out = this.ids.push(out)
         }
@@ -316,6 +341,7 @@ export class DcpStreamScrubber {
 
     reset(): void {
         this.tags.reset()
+        this.echoes.reset()
         this.ids.reset()
     }
 }

@@ -1,6 +1,11 @@
 import type { SessionState } from "../../state"
 import { formatBlockRef } from "../../message-ids"
 
+/** Shared with the nudge-echo scrubber so the recognized text stays in sync. */
+export const GUIDANCE_HEADER = "Compressed block context:"
+export const GUIDANCE_BLOCK_LIST_PREFIX = "- Active compressed blocks in this session:"
+export const GUIDANCE_BOUNDARY_PREFIX = "- Compressed blocks can be used as selection boundaries:"
+
 export function buildCompressedBlockGuidance(state: SessionState): string {
     const refs = Array.from(state.prune.messages.activeBlockIds)
         .filter((id) => Number.isInteger(id) && id > 0)
@@ -10,9 +15,9 @@ export function buildCompressedBlockGuidance(state: SessionState): string {
     const blockList = blockCount > 0 ? refs.join(", ") : "none"
 
     return [
-        "Compressed block context:",
-        `- Active compressed blocks in this session: ${blockCount} (${blockList})`,
-        "- Compressed blocks can be used as selection boundaries: include a block ID (or a range spanning it) to merge its summary into a new summary and retire the old block.",
+        GUIDANCE_HEADER,
+        `${GUIDANCE_BLOCK_LIST_PREFIX} ${blockCount} (${blockList})`,
+        `${GUIDANCE_BOUNDARY_PREFIX} include a block ID (or a range spanning it) to merge its summary into a new summary and retire the old block.`,
     ].join("\n")
 }
 

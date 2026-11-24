@@ -152,6 +152,14 @@ check, typecheck, build, test, `npm audit`.
     removes those echoes before OpenCode stores or displays them. SSE/JSON bodies on
     the `http.response` hook (OpenAI Responses/Chat, Anthropic, Google) and AI SDK
     text/reasoning parts are covered; tool-call arguments are never touched.
+    `lib/nudge-echoes.ts` recognizes the bundled turn/iteration/context-limit nudge
+    heads and the `Compressed block context:` guidance as whole lines, so untagged
+    copies (and repeated guidance tails) are removed too; the same pass runs on
+    request-side text in `stripHallucinations`, keeping old echoes out of later
+    requests without rewriting storage. Tool outputs only get tag/ID stripping,
+    since they may legitimately contain prompt source. The tag stripper also drops
+    an unterminated block whose body matches a known nudge instead of failing open
+    at `MAX_BLOCK_LENGTH`; unknown tags keep the fail-open behavior.
     `stealth.enabled` (master, default `true`) gates both halves: response
     scrubbing via `stealth.scrubModelOutput` / `stealth.scrubMessageIds` (both
     default `true`) and the request-side `stripHallucinations` pass. The legacy
